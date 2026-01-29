@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Telesales Simulator v2.5</title>
+    <title>AI Telesales Simulator v2.6 (Gemini 2.5)</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #2563eb; --bg: #f8fafc; }
@@ -28,16 +28,16 @@
 <div class="container">
     <header>
         <h2>🎧 AI Telesales Simulator (Gemini 2.5)</h2>
-        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">ระบบฝึกพนักงานขายประกันทางโทรศัพท์</p>
+        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">ฝึกทักษะพนักงานขายประกันทางโทรศัพท์</p>
     </header>
 
     <div class="api-section">
-        <label style="font-size: 12px; color: #64748b;">API Key (Gemini 2.5 Preview):</label>
-        <input type="password" id="api-key" placeholder="วาง API Key ใหม่ของคุณที่นี่...">
+        <label style="font-size: 12px; color: #64748b;">API Key (สำหรับรุ่น 2.5 Flash):</label>
+        <input type="password" id="api-key" placeholder="วาง API Key ของคุณที่นี่...">
     </div>
 
     <div id="chat-window">
-        <div class="msg customer">ระบบ: พร้อมเริ่มบทสนทนาแล้วครับ ใส่ Key แล้วกด "เริ่มพูด" ได้เลย</div>
+        <div class="msg customer">ระบบ: ยืนดีด้วยครับ! คุณเชื่อมต่อกับ Gemini 2.5 สำเร็จแล้ว ใส่ Key แล้วกด "เริ่มพูด" ได้เลย</div>
     </div>
 
     <div class="controls">
@@ -54,7 +54,7 @@
 
     let isListening = false;
 
-    // --- ระบบรับเสียง ---
+    // --- ระบบรับเสียง (Speech Recognition) ---
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new Recognition();
     recognition.lang = 'th-TH';
@@ -78,10 +78,10 @@
     recognition.onend = () => { isListening = false; };
     recognition.onerror = () => { isListening = false; updateUI('ready'); };
 
-    // --- ระบบเชื่อมต่อ Gemini 2.5 (แก้ไขตามรูปภาพที่ส่งมา) ---
+    // --- ระบบเชื่อมต่อ Gemini 2.5 Flash Preview TTS ---
     async function askGemini(userInput) {
         const apiKey = apiKeyInput.value.trim();
-        // เปลี่ยนชื่อรุ่นเป็น gemini-2.5-flash-preview-tts ตามรูปที่แสดง
+        // เรียกใช้ Endpoint ตามภาพที่คุณส่งมา
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
         
         updateUI('thinking');
@@ -89,9 +89,9 @@
         const payload = {
             contents: [{
                 parts: [{
-                    text: `คุณคือลูกค้าที่กำลังอารมณ์เสียเพราะมีพนักงานโทรมาขายประกันตอนทำงาน \n` +
-                          `หน้าที่ของคุณ: ตอบโต้ให้สั้น สมจริง และพยายามตัดบท \n` +
-                          `พนักงานพูดว่า: "${userInput}"`
+                    text: `คุณคือ 'คุณวีระ' ลูกค้าที่ยุ่งมากและเพิ่งโดนตัวแทนขายประกันโทรมาขัดจังหวะ \n` +
+                          `เป้าหมาย: ตอบโต้แบบสั้นๆ เหมือนคุยโทรศัพท์จริง และปฏิเสธในช่วงแรก \n` +
+                          `พนักงานขายพูดว่า: "${userInput}"`
                 }]
             }]
         };
@@ -105,7 +105,7 @@
 
             if (!response.ok) {
                 const err = await response.json();
-                throw new Error(err.error?.message || "Error 404/Connection Failed");
+                throw new Error(err.error?.message || "เชื่อมต่อไม่ได้ (Check Model ID)");
             }
 
             const data = await response.json();
@@ -125,7 +125,7 @@
 
     function updateUI(state) {
         if (state === 'listening') {
-            statusBox.innerText = "สถานะ: กำลังฟัง...";
+            statusBox.innerText = "สถานะ: กำลังฟังคุณพูด...";
             statusBox.style.background = "#fef3c7";
             talkBtn.innerText = "🛑 กำลังฟัง...";
             talkBtn.className = "btn-loading";
