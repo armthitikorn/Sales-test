@@ -193,11 +193,32 @@
         chatWindow.scrollTop = chatWindow.scrollHeight;
     }
 
-    function speak(text) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'th-TH';
-        window.speechSynthesis.speak(utterance);
+   function speak(text) {
+    // 1. ล้างคิวเสียงที่อาจค้างอยู่ก่อนหน้า (สำคัญมาก!)
+    window.speechSynthesis.cancel();
+
+    // 2. สร้างตัวอ่านเสียงใหม่
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'th-TH'; // บังคับภาษาไทย
+    utterance.rate = 1.0;     // ความเร็วปกติ (ปรับเป็น 1.1 หรือ 1.2 ได้ถ้าอยากให้พูดเร็วขึ้น)
+    utterance.pitch = 1.0;    // โทนเสียง
+
+    // 3. ป้องกันปัญหา Browser บางตัวหาเสียงไทยไม่เจอ
+    // พยายามดึงเสียงภาษาไทยจากระบบมาใช้โดยตรง
+    const voices = window.speechSynthesis.getVoices();
+    const thaiVoice = voices.find(v => v.lang.includes('th') || v.name.includes('Thai'));
+    if (thaiVoice) {
+        utterance.voice = thaiVoice;
     }
+
+    // 4. สั่งให้พูดออกมา
+    window.speechSynthesis.speak(utterance);
+
+    // 5. ดักจับ Error ถ้าเสียงไม่ยอมออก
+    utterance.onerror = (event) => {
+        console.error("SpeechSynthesis Error:", event.error);
+    };
+}
 </script>
 
 </body>
