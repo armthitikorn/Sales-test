@@ -94,7 +94,7 @@
     };
 
     async function askGemini(userInput) {
-        const apiKey = AIzaSyDCtZUh9NHeg9bheZA7ylst6iiipBRKmu4;
+        const apiKey = apiKeyInput.value;
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
         
         updateStatus("AI กำลังวิเคราะห์และคิดคำตอบ...", "#60a5fa");
