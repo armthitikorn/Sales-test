@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Premium TTS vs Free TTS</title>
+    <style>
+        body { font-family: 'Sarabun', sans-serif; padding: 40px; background: #f0f2f5; text-align: center; }
+        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        button { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; transition: 0.3s; }
+        .btn-free { background: #64748b; }
+        .btn-premium { background: #2563eb; }
+        input { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .status { font-size: 14px; color: #666; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🔊 ทดสอบเปรียบเทียบเสียง</h2>
+    
+    <label style="display:block; text-align:left; font-size:12px; margin-bottom:5px;">วาง Google Cloud API Key:</label>
+    <input type="password" id="gcp-key" placeholder="AIzaSy...">
+
+    <textarea id="text-to-speak" style="width:100%; height:80px; padding:10px; border-radius:8px; border:1px solid #ddd; margin-bottom:10px;">สวัสดีค่ะ ยินดีที่ได้รู้จักนะคะ วันนี้มีประกันแผนใหม่มานำเสนอค่ะ</textarea>
+
+    <button class="btn-free" id="play-free">🎙️ ฟังเสียงฟรี (Web Speech API)</button>
+    <button class="btn-premium" id="play-premium">💎 ฟังเสียงเทพ (Google Cloud TTS)</button>
+    
+    <div id="status" class="status">เลือกกดเพื่อฟังความแตกต่าง</div>
+</div>
+
+<script>
+    const gcpKeyInput = document.getElementById('gcp-key');
+    const textInput = document.getElementById('text-to-speak');
+    const status = document.getElementById('status');
+
+    // --- 1. เสียงฟรี (ของเดิมที่ใช้อยู่) ---
+    document.getElementById('play-free').addEventListener('click', () => {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(textInput.value);
+        utterance.lang = 'th-TH';
+        window.speechSynthesis.speak(utterance);
+        status.innerText = "กำลังเล่น: เสียงฟรีจาก Browser";
+    });
+
+    // --- 2. เสียงเทพ (Google Cloud TTS) ---
+    document.getElementById('play-premium').addEventListener('click', async () => {
+        const apiKey = gcpKeyInput.value.trim();
+        if (!apiKey) { alert("กรุณาใส่ API Key ของ Google Cloud ก่อนครับ"); return; }
+
+        status.innerText = "กำลังเรียกเสียงจากสวรรค์...";
+
+        const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
+        
+        const requestBody = {
+            input: { text: textInput.value },
+            voice: { 
+                languageCode: "th-TH", 
+                name: "th-TH-Standard-A" // หรือใช้ "th-TH-Wavenet-A" สำหรับเสียงเทพสุดๆ
+            },
+            audioConfig: { audioEncoding: "MP3" }
+        };
+
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                body: JSON.stringify(requestBody)
+            });
+
+            const data = await response.json();
+            if (data.audioContent) {
+                // เล่นไฟล์ MP3 ที่ส่งกลับมาในรูปแบบ Base64
+                const audio = new Audio("data:audio/mp3;base64," + data.audioContent);
+                audio.play();
+                status.innerText = "กำลังเล่น: เสียงเทพจาก Google Cloud";
+            } else {
+                throw new Error(data.error.message);
+            }
+        } catch (error) {
+            status.innerText = "Error: " + error.message;
+        }
+    });
+</script>
+
+</body>
+</html>
