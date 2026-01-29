@@ -3,35 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Telesales Training Simulator v3.0</title>
+    <title>AI Telesales Training Simulator v3.1</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #2563eb; --bg: #f8fafc; --white: #ffffff; }
         body { font-family: 'Sarabun', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; justify-content: center; }
         .container { width: 100%; max-width: 700px; background: var(--white); border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; }
         
-        /* Header */
         header { background: var(--primary); color: white; padding: 20px; text-align: center; }
         header h2 { margin: 0; font-size: 1.5rem; }
         
-        /* API Key Section */
         .api-section { padding: 15px 20px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
         input[type="password"] { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; }
 
-        /* Chat Window */
         #chat-window { height: 400px; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; background: #ffffff; }
         .msg { max-width: 85%; padding: 12px 16px; border-radius: 15px; line-height: 1.5; font-size: 15px; }
         .customer { align-self: flex-start; background: #f1f5f9; color: #1e293b; border-bottom-left-radius: 2px; }
         .agent { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
 
-        /* Control Panel */
         .controls { padding: 20px; border-top: 1px solid #f1f5f9; text-align: center; }
         .status-bar { margin-bottom: 15px; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 10px; transition: 0.3s; }
         
-        button { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-bottom: 10px; }
         .btn-ready { background: #10b981; color: white; }
-        .btn-ready:hover { background: #059669; }
         .btn-loading { background: #94a3b8; color: white; cursor: not-allowed; }
+        #test-voice-btn { background: #64748b; color: white; font-size: 14px; padding: 10px; }
     </style>
 </head>
 <body>
@@ -39,48 +35,75 @@
 <div class="container">
     <header>
         <h2>🎧 AI Telesales Simulator</h2>
-        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">ฝึกโต้ตอบกับลูกค้าจำลองด้วย AI</p>
+        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">Gemini 2.5 Pro + ระบบแก้ปัญหาเสียง</p>
     </header>
 
     <div class="api-section">
-        <label style="font-size: 12px; color: #64748b;">Gemini API Key (กรุณาใช้คีย์ใหม่):</label>
+        <label style="font-size: 12px; color: #64748b;">Gemini API Key:</label>
         <input type="password" id="api-key" placeholder="วาง API Key ที่นี่...">
     </div>
 
     <div id="chat-window">
-        <div class="msg customer">ระบบ: พร้อมสำหรับการฝึกแล้วครับ ใส่ Key แล้วกด "เริ่มพูด" ได้เลย</div>
+        <div class="msg customer">ระบบ: พร้อมสำหรับการฝึกแล้วครับ กรุณา "คลิกหน้าจอหนึ่งครั้ง" เพื่อเปิดระบบเสียง จากนั้นใส่ Key แล้วเริ่มฝึกได้เลย</div>
     </div>
 
     <div class="controls">
         <div id="status" class="status-bar" style="background: #f8fafc; color: #64748b;">สถานะ: พร้อมใช้งาน</div>
         <button id="talk-btn" class="btn-ready">🎙️ เริ่มพูด (Push to Talk)</button>
+        <button id="test-voice-btn">🔊 กดเพื่อทดสอบเสียงภาษาไทย</button>
     </div>
 </div>
 
 <script>
     const talkBtn = document.getElementById('talk-btn');
+    const testBtn = document.getElementById('test-voice-btn');
     const statusBox = document.getElementById('status');
     const chatWindow = document.getElementById('chat-window');
     const apiKeyInput = document.getElementById('api-key');
 
     let isListening = false;
+    let thaiVoice = null;
 
-    // --- ส่วนรับเสียง (Speech Recognition) ---
+    // --- 1. ระบบจัดการเสียง (TTS) - แก้ไขปัญหาเสียงไม่ดัง ---
+    function loadVoices() {
+        const voices = window.speechSynthesis.getVoices();
+        thaiVoice = voices.find(v => v.lang.includes('th') || v.name.includes('Thai'));
+    }
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+
+    function speak(text) {
+        window.speechSynthesis.cancel(); // ล้างคิวเก่า
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'th-TH';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        if (thaiVoice) utterance.voice = thaiVoice;
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // --- 2. ระบบจัดการความปลอดภัย (CSP) - ใช้ addEventListener แทน onclick ---
+    talkBtn.addEventListener('click', () => {
+        const key = apiKeyInput.value.trim();
+        if (!key) { alert("กรุณาใส่ API Key ก่อนครับ"); return; }
+        if (isListening) return;
+        
+        // "ปลุก" ระบบเสียง (แก้ปัญหา Chrome บล็อกเสียง)
+        speak(""); 
+
+        try {
+            recognition.start();
+        } catch (e) { console.error("Recognition Start Error:", e); }
+    });
+
+    testBtn.addEventListener('click', () => {
+        speak("สวัสดีครับ ทดสอบเสียงภาษาไทย ได้ยินไหมครับ?");
+    });
+
+    // --- 3. ส่วนรับเสียง (Speech Recognition) ---
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new Recognition();
     recognition.lang = 'th-TH';
-    recognition.interimResults = false;
-    recognition.continuous = false;
-
-    talkBtn.onclick = () => {
-        const key = apiKeyInput.value.trim();
-        if (!key) { alert("กรุณาใส่ API Key ก่อนครับ"); return; }
-        if (isListening) return; // ป้องกัน InvalidStateError
-        
-        try {
-            recognition.start();
-        } catch (e) { console.error("Recognition Error:", e); }
-    };
 
     recognition.onstart = () => {
         isListening = true;
@@ -95,10 +118,7 @@
 
     recognition.onend = () => {
         isListening = false;
-        // คืนค่าปุ่มถ้าไม่ได้กำลังรอ AI
-        if (!statusBox.innerText.includes("AI")) {
-            updateUI('ready');
-        }
+        if (!statusBox.innerText.includes("AI")) updateUI('ready');
     };
 
     recognition.onerror = () => {
@@ -107,7 +127,7 @@
         statusBox.innerText = "สถานะ: ไมโครโฟนขัดข้อง";
     };
 
-// --- ระบบเชื่อมต่อ Gemini 2.5 Pro (บังคับภาษาไทย) ---
+    // --- 4. ระบบเชื่อมต่อ Gemini 2.5 Pro ---
     async function askGemini(userInput) {
         const apiKey = apiKeyInput.value.trim();
         const modelId = "gemini-2.5-pro"; 
@@ -118,15 +138,11 @@
         const payload = {
             contents: [{
                 parts: [{
-                    // ✅ เพิ่มคำสั่งภาษาไทยที่เข้มงวด
                     text: `คุณคือ 'คุณสมชาย' ลูกค้าชาวไทยที่กำลังยุ่งและขี้รำคาญ 
                           กฎเหล็ก:
-                          1. ต้องตอบโต้เป็นภาษาไทยที่สุภาพและเป็นธรรมชาติเท่านั้น
-                          2. ห้ามตอบเป็นภาษาอังกฤษเด็ดขาด
-                          3. ห้ามแนะนำตัวว่าเป็น AI หรือพูดเรื่อง Google/AdWords
-                          4. ตอบสั้นๆ เหมือนคุยโทรศัพท์จริง (ไม่เกิน 1-2 ประโยค)
-                          5. หน้าที่ของคุณคือพยายามปฏิเสธพนักงานขายประกัน
-                          
+                          1. ต้องตอบเป็นภาษาไทยที่สุภาพและเป็นธรรมชาติเท่านั้น ห้ามภาษาอังกฤษ
+                          2. ห้ามพูดเรื่อง AI หรือ Google
+                          3. ตอบสั้นๆ (ไม่เกิน 2 ประโยค) และพยายามปฏิเสธการขายประกัน
                           พนักงานขายพูดว่า: "${userInput}"`
                 }]
             }]
@@ -140,25 +156,15 @@
             });
 
             const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error?.message || "Error");
-            }
+            if (!response.ok) throw new Error(data.error?.message || "Error");
 
             if (data.candidates && data.candidates[0].content) {
                 const aiText = data.candidates[0].content.parts[0].text;
-                
-                // ตรวจสอบเบื้องต้น (เผื่อ AI ยังหลุด)
-                console.log("AI Response:", aiText);
-                
                 appendMessage('customer', aiText);
                 speak(aiText);
             }
-            
             updateUI('ready');
-
         } catch (error) {
-            console.error("API Error:", error);
             statusBox.innerText = "Error: " + error.message;
             statusBox.style.background = "#fee2e2";
             updateUI('ready');
@@ -173,7 +179,7 @@
             talkBtn.innerText = "🛑 กำลังฟัง...";
             talkBtn.className = "btn-loading";
         } else if (state === 'thinking') {
-            statusBox.innerText = "สถานะ: AI กำลังประมวลผลคำตอบ...";
+            statusBox.innerText = "สถานะ: AI กำลังประมวลผล...";
             statusBox.style.background = "#dbeafe";
             talkBtn.innerText = "⌛ รอสักครู่...";
             talkBtn.className = "btn-loading";
@@ -192,33 +198,6 @@
         chatWindow.appendChild(div);
         chatWindow.scrollTop = chatWindow.scrollHeight;
     }
-
-   function speak(text) {
-    // 1. ล้างคิวเสียงที่อาจค้างอยู่ก่อนหน้า (สำคัญมาก!)
-    window.speechSynthesis.cancel();
-
-    // 2. สร้างตัวอ่านเสียงใหม่
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'th-TH'; // บังคับภาษาไทย
-    utterance.rate = 1.0;     // ความเร็วปกติ (ปรับเป็น 1.1 หรือ 1.2 ได้ถ้าอยากให้พูดเร็วขึ้น)
-    utterance.pitch = 1.0;    // โทนเสียง
-
-    // 3. ป้องกันปัญหา Browser บางตัวหาเสียงไทยไม่เจอ
-    // พยายามดึงเสียงภาษาไทยจากระบบมาใช้โดยตรง
-    const voices = window.speechSynthesis.getVoices();
-    const thaiVoice = voices.find(v => v.lang.includes('th') || v.name.includes('Thai'));
-    if (thaiVoice) {
-        utterance.voice = thaiVoice;
-    }
-
-    // 4. สั่งให้พูดออกมา
-    window.speechSynthesis.speak(utterance);
-
-    // 5. ดักจับ Error ถ้าเสียงไม่ยอมออก
-    utterance.onerror = (event) => {
-        console.error("SpeechSynthesis Error:", event.error);
-    };
-}
 </script>
 
 </body>
