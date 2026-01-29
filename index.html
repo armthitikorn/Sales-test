@@ -3,24 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Telesales Simulator v2.1</title>
+    <title>AI Telesales Simulator v2.2</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-        :root { --primary: #2563eb; --bg: #f1f5f9; --white: #ffffff; }
+        :root { --primary: #2563eb; --bg: #f8fafc; }
         body { font-family: 'Sarabun', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 700px; background: var(--white); border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); overflow: hidden; display: flex; flex-direction: column; }
+        .container { width: 100%; max-width: 700px; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; }
         header { background: var(--primary); color: white; padding: 20px; text-align: center; }
-        .api-section { padding: 15px 20px; background: #e2e8f0; border-bottom: 1px solid #cbd5e1; }
-        input[type="password"] { width: 100%; padding: 10px; border: 1px solid #94a3b8; border-radius: 6px; box-sizing: border-box; }
-        #chat-window { height: 400px; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; background: #fafafa; border-bottom: 1px solid #eee; }
-        .msg { max-width: 85%; padding: 12px 16px; border-radius: 15px; line-height: 1.5; }
-        .customer { align-self: flex-start; background: #e9ecef; color: #1e293b; border-bottom-left-radius: 2px; }
+        .api-section { padding: 15px 20px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
+        input[type="password"] { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; }
+        #chat-window { height: 400px; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; background: #ffffff; }
+        .msg { max-width: 85%; padding: 12px 16px; border-radius: 15px; line-height: 1.5; font-size: 15px; }
+        .customer { align-self: flex-start; background: #f1f5f9; color: #1e293b; border-bottom-left-radius: 2px; }
         .agent { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
-        .controls { padding: 20px; text-align: center; }
-        .status-bar { margin-bottom: 15px; font-weight: bold; font-size: 14px; padding: 8px; border-radius: 10px; }
+        .controls { padding: 20px; border-top: 1px solid #f1f5f9; text-align: center; }
+        .status-bar { margin-bottom: 15px; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 10px; transition: 0.3s; }
         button { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn-ready { background: #10b981; color: white; }
-        .btn-loading { background: #94a3b8; color: white; cursor: wait; }
+        .btn-ready:hover { background: #059669; }
+        .btn-loading { background: #94a3b8; color: white; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -28,21 +29,21 @@
 <div class="container">
     <header>
         <h2>🎧 AI Telesales Simulator</h2>
-        <p style="margin:5px 0 0 0; font-size: 0.8em;">ระบบฝึกขายประกันอัตโนมัติ</p>
+        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">ฝึกทักษะการขายประกันด้วย AI</p>
     </header>
 
     <div class="api-section">
-        <label style="font-size: 12px;">Gemini API Key (สร้างใหม่ทุกครั้งถ้าหลุด):</label>
+        <label style="font-size: 12px; color: #64748b;">Gemini API Key (กรุณาใช้คีย์ใหม่):</label>
         <input type="password" id="api-key" placeholder="วาง API Key ที่นี่...">
     </div>
 
     <div id="chat-window">
-        <div class="msg customer">ระบบ: สวัสดีครับ พร้อมเริ่มฝึกหรือยังครับ? ใส่ API Key แล้วกดปุ่ม "เริ่มพูด" ได้เลย</div>
+        <div class="msg customer">ระบบ: ยินดีต้อนรับครับ! ใส่ API Key แล้วกดปุ่ม "เริ่มพูด" เพื่อทดสอบบทสนทนาได้เลย</div>
     </div>
 
     <div class="controls">
-        <div id="status" class="status-bar" style="background: #f1f5f9; color: #64748b;">สถานะ: พร้อมใช้งาน</div>
-        <button id="talk-btn" class="btn-ready">🎙️ เริ่มพูด (Push to Talk)</button>
+        <div id="status" class="status-bar" style="background: #f8fafc; color: #64748b;">สถานะ: พร้อมใช้งาน</div>
+        <button id="talk-btn" class="btn-ready">🎙️ เริ่มพูด (Talk to Customer)</button>
     </div>
 </div>
 
@@ -54,22 +55,17 @@
 
     let isListening = false;
 
-    // --- Web Speech API ---
+    // --- Speech Recognition ---
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) {
-        alert("เบราว์เซอร์ของคุณไม่รองรับการสั่งงานด้วยเสียง กรุณาใช้ Google Chrome ครับ");
-    }
     const recognition = new Recognition();
     recognition.lang = 'th-TH';
 
     talkBtn.onclick = () => {
-        const key = apiKeyInput.value.trim(); // ล้างช่องว่างที่อาจติดมา
-        if (!key) {
+        if (!apiKeyInput.value.trim()) {
             alert("กรุณาใส่ API Key ก่อนครับ");
             return;
         }
         if (isListening) return;
-        
         try {
             recognition.start();
             isListening = true;
@@ -86,18 +82,20 @@
     recognition.onend = () => { isListening = false; };
     recognition.onerror = () => { isListening = false; updateUI('ready'); };
 
-    // --- เชื่อมต่อ Gemini (เวอร์ชันแก้ไข 404) ---
+    // --- เชื่อมต่อ Gemini (v1beta - สำหรับ Gemini 1.5 Flash) ---
     async function askGemini(userInput) {
         const apiKey = apiKeyInput.value.trim();
-        // เปลี่ยนเป็น v1 และเช็ก Model Name
-        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        // ใช้ v1beta ซึ่งรองรับ gemini-1.5-flash ได้แน่นอนกว่า
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
         
         updateUI('thinking');
 
         const payload = {
             contents: [{
                 parts: [{
-                    text: `คุณคือ 'คุณวีระ' ลูกค้าขี้รำคาญที่พนักงานขายประกันโทรหา จงตอบโต้สั้นๆ และปฏิเสธในช่วงแรก\nพนักงานพูดว่า: "${userInput}"`
+                    text: `คุณคือ 'คุณมานะ' ลูกค้าที่กำลังทำกับข้าวอยู่และไม่สะดวกคุยประกัน \n` +
+                          `คำสั่ง: ตอบโต้สั้นๆ ปฏิเสธอย่างสุภาพแต่หนักแน่น \n` +
+                          `พนักงานขายพูดว่า: "${userInput}"`
                 }]
             }]
         };
@@ -110,9 +108,8 @@
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                console.error("API Error:", errorData);
-                throw new Error(errorData.error.message || "Unknown Error");
+                const err = await response.json();
+                throw new Error(err.error?.message || "เชื่อมต่อไม่ได้");
             }
 
             const data = await response.json();
@@ -123,7 +120,7 @@
             updateUI('ready');
 
         } catch (error) {
-            console.error("Fetch Error:", error);
+            console.error("API Error:", error);
             statusBox.innerText = "Error: " + error.message;
             statusBox.style.background = "#fee2e2";
             updateUI('ready');
@@ -134,15 +131,18 @@
         if (state === 'listening') {
             statusBox.innerText = "สถานะ: กำลังฟัง...";
             statusBox.style.background = "#fef3c7";
-            talkBtn.innerText = "🛑 กำลังฟัง...";
+            talkBtn.innerText = "🛑 กำลังฟังเสียง...";
+            talkBtn.className = "btn-loading";
         } else if (state === 'thinking') {
-            statusBox.innerText = "สถานะ: AI กำลังคิด...";
+            statusBox.innerText = "สถานะ: ลูกค้ากำลังคิด...";
             statusBox.style.background = "#dbeafe";
-            talkBtn.innerText = "⌛ รอสักครู่...";
+            talkBtn.innerText = "⌛ รอคำตอบ...";
+            talkBtn.className = "btn-loading";
         } else {
             statusBox.innerText = "สถานะ: พร้อมฟังต่อ";
             statusBox.style.background = "#d1fae5";
-            talkBtn.innerText = "🎙️ เริ่มพูด (Push to Talk)";
+            talkBtn.innerText = "🎙️ เริ่มพูด (Talk to Customer)";
+            talkBtn.className = "btn-ready";
         }
     }
 
