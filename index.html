@@ -107,12 +107,12 @@
         statusBox.innerText = "สถานะ: ไมโครโฟนขัดข้อง";
     };
 
-    // --- ส่วนเชื่อมต่อ AI (Gemini 1.5 Flash) ---
+    // --- ส่วนเชื่อมต่อ AI (gemini-2.5-pro) ---
     async function askGemini(userInput) {
         const apiKey = apiKeyInput.value.trim();
         // ใช้รุ่น gemini-1.5-flash เพื่อให้รองรับข้อความ (TEXT)
-        const modelId = "gemini-1.5-flash"; 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+        const modelId = "gemini-2.5-pro"; 
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${gemini-2.5-pro}:generateContent?key=${apiKey}`;
         
         updateUI('thinking');
 
