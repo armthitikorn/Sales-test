@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Telesales Training Simulator</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --text: #1e293b;
+        }
+        body { font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 800px; background: white; border-radius: 16px; shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 25px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        header { border-bottom: 2px solid #f1f5f9; padding-bottom: 15px; margin-bottom: 20px; text-align: center; }
+        
+        /* Chat Area */
+        #chat-window { height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; background: #ffffff; }
+        .msg { max-width: 80px; padding: 12px 16px; border-radius: 12px; line-height: 1.5; font-size: 15px; }
+        .customer { align-self: flex-start; background: #f1f5f9; color: #334155; border-bottom-left-radius: 2px; }
+        .agent { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
+        
+        /* Controls */
+        .controls { display: flex; flex-direction: column; gap: 10px; }
+        .status-bar { text-align: center; font-size: 14px; font-weight: bold; padding: 8px; border-radius: 8px; background: #f1f5f9; }
+        .btn-group { display: flex; gap: 10px; }
+        button { flex: 1; padding: 15px; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        #start-btn { background: #10b981; color: white; }
+        #start-btn:hover { background: #059669; }
+        #stop-btn { background: #ef4444; color: white; }
+        
+        .api-config { margin-bottom: 15px; font-size: 12px; }
+        input[type="password"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <header>
+        <h2>🎧 AI Telesales Role-Play</h2>
+        <p>ฝึกการตอบข้อโต้แย้งและการขายประกัน</p>
+    </header>
+
+    <div class="api-config">
+        <label>ใส่ Gemini API Key ของคุณ:</label>
+        <input type="password" id="api-key" placeholder="Paste your API Key here...">
+    </div>
+
+    <div id="status" class="status-bar">สถานะ: พร้อมใช้งาน</div>
+
+    <div id="chat-window">
+        <div class="msg customer">ระบบ: กรุณาใส่ API Key แล้วกดปุ่ม "เริ่มพูด" เพื่อเริ่มการฝึก</div>
+    </div>
+
+    <div class="controls">
+        <div class="btn-group">
+            <button id="start-btn">🎙️ เริ่มพูด (Hold to Talk)</button>
+        </div>
+        <small style="text-align: center; color: #64748b;">*ระบบจะประมวลผลเมื่อคุณพูดจบ*</small>
+    </div>
+</div>
+
+<script>
+    // --- การตั้งค่าเบื้องต้น ---
+    const chatWindow = document.getElementById('chat-window');
+    const statusBox = document.getElementById('status');
+    const apiKeyInput = document.getElementById('api-key');
+    const startBtn = document.getElementById('start-btn');
+
+    // ส่วนของ Web Speech API (ฟังเสียง)
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = (Recognition) ? new Recognition() : null;
+    if(recognition) {
+        recognition.lang = 'th-TH';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+    }
+
+    // --- ฟังก์ชันการทำงาน ---
+
+    startBtn.onclick = () => {
+        if (!apiKeyInput.value) {
+            alert("กรุณาใส่ API Key ก่อนครับ");
+            return;
+        }
+        recognition.start();
+        updateStatus("กำลังฟัง...", "#fbbf24");
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        appendMessage('agent', transcript);
+        askGemini(transcript);
+    };
+
+    async function askGemini(userInput) {
+        const apiKey = AIzaSyDCtZUh9NHeg9bheZA7ylst6iiipBRKmu4;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        
+        updateStatus("AI กำลังวิเคราะห์และคิดคำตอบ...", "#60a5fa");
+
+        const systemPrompt = "คุณคือ 'คุณสมพร' ลูกค้าที่ยุ่งมาก และเพิ่งโดนตัวแทนขายประกันโทรมาขัดจังหวะการทำงาน " +
+                             "นิสัย: พูดน้อย, ขี้รำคาญ, ชอบถามจี้จุดเรื่องความคุ้มค่า " +
+                             "เงื่อนไข: ให้ตอบโต้สั้นๆ เหมือนคุยโทรศัพท์จริง และพยายามปฏิเสธด้วยเหตุผลต่างๆ (เช่น มีแล้ว, ไม่ว่าง, แพงไป) " +
+                             "ถ้าพนักงานพูดโน้มน้าวใจได้ดีมากจริงๆ ถึงจะยอมฟังต่อ";
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `${systemPrompt}\n\nพนักงานขายพูดว่า: "${userInput}"` }] }]
+                })
+            });
+
+            const data = await response.json();
+            const aiText = data.candidates[0].content.parts[0].text;
+            
+            appendMessage('customer', aiText);
+            speak(aiText);
+            updateStatus("พร้อมฟังต่อ", "#10b981");
+
+        } catch (error) {
+            console.error(error);
+            updateStatus("เกิดข้อผิดพลาด!", "#ef4444");
+        }
+    }
+
+    function appendMessage(role, text) {
+        const div = document.createElement('div');
+        div.className = `msg ${role}`;
+        div.innerText = (role === 'agent' ? '🙋‍♂️ คุณ: ' : '👤 ลูกค้า: ') + text;
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function speak(text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'th-TH';
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function updateStatus(text, color) {
+        statusBox.innerText = `สถานะ: ${text}`;
+        statusBox.style.background = color;
+        statusBox.style.color = (color === "#fbbf24") ? "black" : "white";
+    }
+</script>
+
+</body>
+</html>
