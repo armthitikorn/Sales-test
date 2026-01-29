@@ -37,7 +37,7 @@
     </div>
 
     <div id="chat-window">
-        <div class="msg customer">ระบบ: ยืนดีด้วยครับ! คุณเชื่อมต่อกับ Gemini 2.5 สำเร็จแล้ว ใส่ Key แล้วกด "เริ่มพูด" ได้เลย</div>
+        <div class="msg customer">ระบบ: ยืนดีด้วยครับ! คุณเชื่อมต่อกับ gemini-3-pro-preview สำเร็จแล้ว ใส่ Key แล้วกด "เริ่มพูด" ได้เลย</div>
     </div>
 
     <div class="controls">
@@ -78,11 +78,11 @@
     recognition.onend = () => { isListening = false; };
     recognition.onerror = () => { isListening = false; updateUI('ready'); };
 
-    // --- ระบบเชื่อมต่อ Gemini 2.5 Flash Preview TTS ---
+    // --- ระบบเชื่อมต่อ gemini-3-pro-preview ---
     async function askGemini(userInput) {
         const apiKey = apiKeyInput.value.trim();
         // เรียกใช้ Endpoint ตามภาพที่คุณส่งมา
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`;
         
         updateUI('thinking');
 
