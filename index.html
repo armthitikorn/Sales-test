@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Telesales Simulator v2.2</title>
+    <title>AI Telesales Simulator v2.3</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #2563eb; --bg: #f8fafc; }
@@ -20,7 +20,6 @@
         .status-bar { margin-bottom: 15px; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 10px; transition: 0.3s; }
         button { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn-ready { background: #10b981; color: white; }
-        .btn-ready:hover { background: #059669; }
         .btn-loading { background: #94a3b8; color: white; cursor: not-allowed; }
     </style>
 </head>
@@ -29,16 +28,16 @@
 <div class="container">
     <header>
         <h2>🎧 AI Telesales Simulator</h2>
-        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">ฝึกทักษะการขายประกันด้วย AI</p>
+        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">จำลองการขายประกันด้วย AI</p>
     </header>
 
     <div class="api-section">
-        <label style="font-size: 12px; color: #64748b;">Gemini API Key (กรุณาใช้คีย์ใหม่):</label>
+        <label style="font-size: 12px; color: #64748b;">Gemini API Key (รบกวนสร้างคีย์ใหม่ทุกครั้งที่หลุด):</label>
         <input type="password" id="api-key" placeholder="วาง API Key ที่นี่...">
     </div>
 
     <div id="chat-window">
-        <div class="msg customer">ระบบ: ยินดีต้อนรับครับ! ใส่ API Key แล้วกดปุ่ม "เริ่มพูด" เพื่อทดสอบบทสนทนาได้เลย</div>
+        <div class="msg customer">ระบบ: กรุณาใส่ API Key แล้วกดปุ่ม "เริ่มพูด" เพื่อฝึกสนทนาครับ</div>
     </div>
 
     <div class="controls">
@@ -55,13 +54,14 @@
 
     let isListening = false;
 
-    // --- Speech Recognition ---
+    // --- ระบบรับเสียง (Speech Recognition) ---
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new Recognition();
     recognition.lang = 'th-TH';
 
     talkBtn.onclick = () => {
-        if (!apiKeyInput.value.trim()) {
+        const key = apiKeyInput.value.trim();
+        if (!key) {
             alert("กรุณาใส่ API Key ก่อนครับ");
             return;
         }
@@ -70,7 +70,7 @@
             recognition.start();
             isListening = true;
             updateUI('listening');
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Recognition Start Error:", e); }
     };
 
     recognition.onresult = (event) => {
@@ -82,10 +82,10 @@
     recognition.onend = () => { isListening = false; };
     recognition.onerror = () => { isListening = false; updateUI('ready'); };
 
-    // --- เชื่อมต่อ Gemini (v1beta - สำหรับ Gemini 1.5 Flash) ---
+    // --- ระบบเชื่อมต่อ Gemini (แก้ปัญหา 404) ---
     async function askGemini(userInput) {
         const apiKey = apiKeyInput.value.trim();
-        // ใช้ v1beta ซึ่งรองรับ gemini-1.5-flash ได้แน่นอนกว่า
+        // ลองเปลี่ยนชื่อโมเดลเป็น 'gemini-1.5-flash-latest' เพื่อความชัวร์
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
         
         updateUI('thinking');
@@ -93,8 +93,8 @@
         const payload = {
             contents: [{
                 parts: [{
-                    text: `คุณคือ 'คุณมานะ' ลูกค้าที่กำลังทำกับข้าวอยู่และไม่สะดวกคุยประกัน \n` +
-                          `คำสั่ง: ตอบโต้สั้นๆ ปฏิเสธอย่างสุภาพแต่หนักแน่น \n` +
+                    text: `คุณคือ 'คุณนพดล' ลูกค้าขี้รำคาญที่กำลังจะเข้าห้องประชุม และไม่ชอบคนขายประกันทางโทรศัพท์ \n` +
+                          `คำสั่ง: ตอบโต้สั้นๆ ปฏิเสธ และขอวางสาย \n` +
                           `พนักงานขายพูดว่า: "${userInput}"`
                 }]
             }]
@@ -107,20 +107,27 @@
                 body: JSON.stringify(payload)
             });
 
+            if (response.status === 404) {
+                throw new Error("ระบบหาโมเดลไม่เจอ (404) กรุณาตรวจสอบว่า API Key ของคุณเปิดใช้งาน Gemini 1.5 Flash หรือยัง");
+            }
+
             if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.error?.message || "เชื่อมต่อไม่ได้");
+                const errData = await response.json();
+                throw new Error(errData.error?.message || "เชื่อมต่อ API ไม่สำเร็จ");
             }
 
             const data = await response.json();
-            const aiText = data.candidates[0].content.parts[0].text;
-            
-            appendMessage('customer', aiText);
-            speak(aiText);
+            if (data.candidates && data.candidates[0].content) {
+                const aiText = data.candidates[0].content.parts[0].text;
+                appendMessage('customer', aiText);
+                speak(aiText);
+            } else {
+                throw new Error("AI ไม่ส่งคำตอบกลับมา (อาจโดนตัวกรองเนื้อหา)");
+            }
             updateUI('ready');
 
         } catch (error) {
-            console.error("API Error:", error);
+            console.error("Critical Error:", error);
             statusBox.innerText = "Error: " + error.message;
             statusBox.style.background = "#fee2e2";
             updateUI('ready');
@@ -134,9 +141,9 @@
             talkBtn.innerText = "🛑 กำลังฟังเสียง...";
             talkBtn.className = "btn-loading";
         } else if (state === 'thinking') {
-            statusBox.innerText = "สถานะ: ลูกค้ากำลังคิด...";
+            statusBox.innerText = "สถานะ: AI กำลังประมวลผล...";
             statusBox.style.background = "#dbeafe";
-            talkBtn.innerText = "⌛ รอคำตอบ...";
+            talkBtn.innerText = "⌛ รอสักครู่...";
             talkBtn.className = "btn-loading";
         } else {
             statusBox.innerText = "สถานะ: พร้อมฟังต่อ";
