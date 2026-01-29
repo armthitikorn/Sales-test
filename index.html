@@ -107,10 +107,9 @@
         statusBox.innerText = "สถานะ: ไมโครโฟนขัดข้อง";
     };
 
-    // --- ส่วนเชื่อมต่อ AI (gemini-2.5-pro) ---
+// --- ระบบเชื่อมต่อ Gemini 2.5 Pro (บังคับภาษาไทย) ---
     async function askGemini(userInput) {
         const apiKey = apiKeyInput.value.trim();
-        // ใช้รุ่น gemini-1.5-flash เพื่อให้รองรับข้อความ (TEXT)
         const modelId = "gemini-2.5-pro"; 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
         
@@ -119,9 +118,16 @@
         const payload = {
             contents: [{
                 parts: [{
-                    text: `คุณคือลูกค้าชื่อ 'คุณวิชัย' ที่ยุ่งมากและไม่ชอบคนโทรมาขายประกัน \n` +
-                          `คำสั่ง: ตอบโต้สั้นๆ สมจริง และพยายามปฏิเสธในช่วงแรก \n` +
-                          `พนักงานขายพูดว่า: "${userInput}"`
+                    // ✅ เพิ่มคำสั่งภาษาไทยที่เข้มงวด
+                    text: `คุณคือ 'คุณสมชาย' ลูกค้าชาวไทยที่กำลังยุ่งและขี้รำคาญ 
+                          กฎเหล็ก:
+                          1. ต้องตอบโต้เป็นภาษาไทยที่สุภาพและเป็นธรรมชาติเท่านั้น
+                          2. ห้ามตอบเป็นภาษาอังกฤษเด็ดขาด
+                          3. ห้ามแนะนำตัวว่าเป็น AI หรือพูดเรื่อง Google/AdWords
+                          4. ตอบสั้นๆ เหมือนคุยโทรศัพท์จริง (ไม่เกิน 1-2 ประโยค)
+                          5. หน้าที่ของคุณคือพยายามปฏิเสธพนักงานขายประกัน
+                          
+                          พนักงานขายพูดว่า: "${userInput}"`
                 }]
             }]
         };
@@ -136,15 +142,19 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error?.message || "เชื่อมต่อ API ล้มเหลว");
+                throw new Error(data.error?.message || "Error");
             }
 
             if (data.candidates && data.candidates[0].content) {
                 const aiText = data.candidates[0].content.parts[0].text;
+                
+                // ตรวจสอบเบื้องต้น (เผื่อ AI ยังหลุด)
+                console.log("AI Response:", aiText);
+                
                 appendMessage('customer', aiText);
                 speak(aiText);
             }
-
+            
             updateUI('ready');
 
         } catch (error) {
