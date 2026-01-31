@@ -34,7 +34,7 @@
     const textInput = document.getElementById('text-to-speak');
     const status = document.getElementById('status');
 
-    // --- 1. เสียงฟรี (ของเดิมที่ใช้อยู่) ---
+    // --- 1. เสียงฟรี (Browser) ---
     document.getElementById('play-free').addEventListener('click', () => {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(textInput.value);
@@ -50,13 +50,14 @@
 
         status.innerText = "กำลังเรียกเสียงจากสวรรค์...";
 
-const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=AIzaSyDLF_bzfpeM5bpQvVY-CQF4QOPe15EIVtE;
+        // ✅ แก้ไขบรรทัดนี้แล้ว
+        const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
         
         const requestBody = {
             input: { text: textInput.value },
             voice: { 
                 languageCode: "th-TH", 
-                name: "th-TH-Standard-A" // หรือใช้ "th-TH-Wavenet-A" สำหรับเสียงเทพสุดๆ
+                name: "th-TH-Standard-A" 
             },
             audioConfig: { audioEncoding: "MP3" }
         };
@@ -69,12 +70,11 @@ const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=AIzaSyDL
 
             const data = await response.json();
             if (data.audioContent) {
-                // เล่นไฟล์ MP3 ที่ส่งกลับมาในรูปแบบ Base64
                 const audio = new Audio("data:audio/mp3;base64," + data.audioContent);
                 audio.play();
                 status.innerText = "กำลังเล่น: เสียงเทพจาก Google Cloud";
             } else {
-                throw new Error(data.error.message);
+                throw new Error(data.error ? data.error.message : "เกิดข้อผิดพลาดไม่ทราบสาเหตุ");
             }
         } catch (error) {
             status.innerText = "Error: " + error.message;
