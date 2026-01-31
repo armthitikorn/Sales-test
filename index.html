@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>AI Telesales Simulator v4.5 (Gemini 2.5 Flash)</title>
+    <title>AI Telesales Simulator v4.6 (Dual Key Mode)</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #2563eb; --bg: #f0f2f5; }
@@ -26,15 +26,19 @@
 <div class="container">
     <header>
         <h2>🎧 AI Telesales Simulator</h2>
-        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">Gemini 2.5 Flash | Male-Vocal Mod</p>
+        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">จำลองการขายประกัน (Gemini 2.5 Flash + Premium Voice)</p>
     </header>
 
     <div class="api-panel">
-        <input type="password" id="gemini-key" placeholder="วาง API Key (กุญแจหลัก)">
-        </div>
+        <label style="font-size: 12px; color: #64748b;">Gemini API Key (สมอง):</label>
+        <input type="password" id="gemini-key" placeholder="วาง Gemini API Key ที่นี่">
+        
+        <label style="font-size: 12px; color: #64748b;">Google Cloud API Key (เสียง):</label>
+        <input type="password" id="gcp-key" placeholder="วาง Google Cloud API Key ที่นี่">
+    </div>
 
     <div id="chat-window">
-        <div class="msg customer">ลูกค้า: (วาง API Key แล้วเริ่มพูดได้เลยครับ)</div>
+        <div class="msg customer">ลูกค้า: (ใส่กุญแจให้ครบ 2 ช่องแล้วเริ่มคุยได้เลยครับ)</div>
     </div>
 
     <div class="controls">
@@ -60,7 +64,7 @@
         const unlockAudio = new Audio();
         unlockAudio.play().catch(() => {}); 
         recognition.start();
-        statusBox.innerText = "สถานะ: กำลังฟังคุณ...";
+        statusBox.innerText = "สถานะ: กำลังฟัง...";
         talkBtn.disabled = true;
     });
 
@@ -72,18 +76,18 @@
 
     recognition.onend = () => { if (!isProcessing) talkBtn.disabled = false; };
 
-    // --- 2. สมอง Gemini 2.5 Flash ---
+    // --- 2. ระบบคิดคำตอบ (Gemini 2.5 Flash) ---
     async function askGemini(userInput) {
         isProcessing = true;
-        statusBox.innerText = "สถานะ: คุณวีระกำลังฟัง...";
+        statusBox.innerText = "สถานะ: ลูกค้ากำลังคิด...";
         const apiKey = document.getElementById('gemini-key').value.trim();
         
         const modelId = "gemini-2.5-flash"; 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
         
-        const prompt = `คุณคือ 'คุณวีระ' ลูกค้าผู้ชายที่กำลังยุ่งและไม่ชอบคนขายประกัน 
-                       กฎ: ตอบสั้นๆ ห้ามเกิน 10 คำ 
-                       อารมณ์: ปฏิเสธอย่างสุภาพแต่รีบวางสาย 
+        const prompt = `คุณคือ 'คุณวีระ' ลูกค้าผู้ชายวัยทำงานที่ยุ่งมาก 
+                       กฎ: ตอบสั้นที่สุด (ห้ามเกิน 10 คำ) 
+                       อารมณ์: ปฏิเสธพนักงานขายประกันสั้นๆ อย่างมีมารยาท
                        พนักงานพูด: "${userInput}"`;
 
         try {
@@ -112,26 +116,26 @@
         }
     }
 
-    // --- 3. เสียงเทพ (Male Mod: แก้ Error 400 และชื่อเสียง) ---
+    // --- 3. ระบบเสียงเทพ (Male Mod) ---
     async function speakPremium(text) {
-        const apiKey = document.getElementById('gemini-key').value.trim();
+        const apiKey = document.getElementById('gcp-key').value.trim();
         if (!apiKey || !text) return;
 
         const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
         
         const requestOptions = {
             method: "POST",
-            headers: { "Content-Type": "application/json" }, // ✅ แก้ Error 400
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 input: { text: text },
                 voice: { 
                     languageCode: "th-TH", 
-                    name: "th-TH-Standard-A" // ✅ ใช้ชื่อที่ชัวร์ที่สุดว่ามีในระบบ
+                    name: "th-TH-Standard-A" 
                 },
                 audioConfig: { 
                     audioEncoding: "MP3", 
-                    speakingRate: 1.25, // เร็วทันใจ
-                    pitch: -7.5 // 💡 ทริคเด็ด: ลดโทนเสียงลง -7.5 เพื่อเปลี่ยนจากหญิงเป็นชาย!
+                    speakingRate: 1.25,
+                    pitch: -7.5 // ปรับโทนให้เป็นเสียงผู้ชาย
                 }
             })
         };
@@ -158,5 +162,6 @@
         chatWindow.scrollTop = chatWindow.scrollHeight;
     }
 </script>
+
 </body>
 </html>
