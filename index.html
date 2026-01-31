@@ -71,40 +71,49 @@
 
     recognition.onend = () => { if (!isProcessing) talkBtn.disabled = false; };
 
-    // --- 2. ระบบคิดคำตอบ (Gemini 2.5 Pro) ---
+// --- 2. ระบบคิดคำตอบ (เน้นความเร็ว) ---
     async function askGemini(userInput) {
         isProcessing = true;
-        statusBox.innerText = "สถานะ: ลูกค้ากำลังคิด...";
+        statusBox.innerText = "สถานะ: ลูกค้ากำลังฟัง..."; // เปลี่ยนคำให้ดูไม่นิ่งเกินไป
         const apiKey = document.getElementById('gemini-key').value.trim();
         
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
+        // แนะนำให้ลองใช้ gemini-2.5-flash ถ้ามีในลิสต์ของคุณ เพราะจะเร็วกว่า Pro มากครับ
+        const modelId = "gemini-2.5-flash"; 
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
         
-        const prompt = `คุณคือ 'คุณวีระ' ลูกค้าชาวไทยวัยทำงานที่กำลังยุ่งมาก 
-                       บทบาท: คุณไม่ชอบคนโทรมาขายประกัน และจะพยายามปฏิเสธอย่างสุภาพแต่หนักแน่นในตอนแรก
-                       กฎ: ตอบโต้เป็นภาษาไทยสั้นๆ (ไม่เกิน 2 ประโยค) เหมือนคุยโทรศัพท์จริง ห้ามหลุดคาแรกเตอร์
-                       พนักงานขายพูดว่า: "${userInput}"`;
+        // Prompt ที่กระชับขึ้นช่วยให้ AI ประมวลผลไวขึ้น
+        const prompt = `คุณคือ 'คุณวีระ' (ผู้ชาย) ลูกค้าที่ยุ่งมาก 
+                       กฎ: ตอบภาษาไทยสั้นๆ เท่านั้น (ห้ามเกิน 10 คำ) 
+                       อารมณ์: ปฏิเสธการขายประกันอย่างสุภาพ
+                       พนักงานพูด: "${userInput}"`;
 
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                body: JSON.stringify({ 
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        maxOutputTokens: 50, // จำกัดจำนวนคำเพื่อให้ AI หยุดคิดไวขึ้น
+                        temperature: 0.7
+                    }
+                })
             });
             const data = await response.json();
             const aiResponse = data.candidates[0].content.parts[0].text;
             
             appendMessage('customer', aiResponse);
-            await speakPremium(aiResponse); // เรียกใช้เสียงเทพ
+            await speakPremium(aiResponse); 
         } catch (e) {
-            statusBox.innerText = "Error (Gemini): " + e.message;
+            console.error(e);
         } finally {
             isProcessing = false;
-            statusBox.innerText = "สถานะ: พร้อมฟังต่อ";
+            statusBox.innerText = "สถานะ: พร้อมรับสาย";
             talkBtn.disabled = false;
         }
     }
 
-    // --- 3. ระบบเสียงเทพ (Google Cloud TTS) ---
+    // --- 3. ระบบเสียงเทพ (ปรับเป็นเสียงผู้ชาย) ---
     async function speakPremium(text) {
         const apiKey = document.getElementById('gcp-key').value.trim();
         if (!apiKey) return;
@@ -112,15 +121,21 @@
         const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
         const body = {
             input: { text: text },
-            voice: { languageCode: "th-TH", name: "th-TH-Standard-A" },
-            audioConfig: { audioEncoding: "MP3" }
+            voice: { 
+                languageCode: "th-TH", 
+                name: "th-TH-Standard-B" // ✅ เปลี่ยนเป็น Standard-B เพื่อให้เป็นเสียงผู้ชาย
+            },
+            audioConfig: { 
+                audioEncoding: "MP3",
+                speakingRate: 1.1 // เพิ่มความเร็วในการพูดนิดหน่อยเพื่อให้ดูทันใจ
+            }
         };
 
         try {
             const response = await fetch(url, { method: "POST", body: JSON.stringify(body) });
             const data = await response.json();
             const audio = new Audio("data:audio/mp3;base64," + data.audioContent);
-            await audio.play();
+            audio.play();
         } catch (e) {
             console.error("TTS Error:", e);
         }
