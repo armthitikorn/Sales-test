@@ -108,33 +108,88 @@
     }
 
     // --- 2. ปรับเป็นเสียงผู้ชายและเพิ่มสปีดการพูด ---
-    async function speakPremium(text) {
-        const apiKey = document.getElementById('gcp-key').value.trim();
-        if (!apiKey) return;
-
-        const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
-        const body = {
-            input: { text: text },
-            voice: { 
-                languageCode: "th-TH", 
-                name: "th-TH-Standard-B" // ✅ เปลี่ยนเป็น Standard-B (เสียงผู้ชาย)
-            },
-            audioConfig: { 
-                audioEncoding: "MP3",
-                speakingRate: 1.15 // ✅ ปรับให้พูดเร็วขึ้นนิดหน่อยเพื่อให้ดูทันใจ
-            }
-        };
+// --- 2. ระบบคิดคำตอบ (Gemini 2.5 Flash) ---
+    async function askGemini(userInput) {
+        isProcessing = true;
+        statusBox.innerText = "สถานะ: คุณวีระกำลังฟัง...";
+        const apiKey = document.getElementById('gemini-key').value.trim();
+        
+        // มั่นใจได้เลยครับ ใช้ Gemini 2.5 Flash ตามที่คุณสั่งไว้เสมอ
+        const modelId = "gemini-2.5-flash"; 
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+        
+        const prompt = `คุณคือ 'คุณวีระ' ลูกค้าผู้ชายที่กำลังยุ่ง 
+                       กฎ: ตอบสั้นที่สุด (ไม่เกิน 10 คำ) 
+                       อารมณ์: ปฏิเสธพนักงานขายประกันสั้นๆ
+                       พนักงานพูด: "${userInput}"`;
 
         try {
-            const response = await fetch(url, { method: "POST", body: JSON.stringify(body) });
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { maxOutputTokens: 50, temperature: 0.7 }
+                })
+            });
             const data = await response.json();
-            const audio = new Audio("data:audio/mp3;base64," + data.audioContent);
-            await audio.play();
+            
+            if (data.error) throw new Error(data.error.message);
+
+            const aiResponse = data.candidates[0].content.parts[0].text;
+            appendMessage('customer', aiResponse);
+            
+            // ส่งคำตอบไปให้กล่องเสียงทำงาน
+            await speakPremium(aiResponse); 
+            
         } catch (e) {
-            console.error("TTS Error:", e);
+            statusBox.innerText = "แจ้งเตือน: " + e.message;
+        } finally {
+            isProcessing = false;
+            if (!statusBox.innerText.includes("แจ้งเตือน")) statusBox.innerText = "สถานะ: พร้อมรับสาย";
+            talkBtn.disabled = false;
         }
     }
 
+    // --- 3. ระบบเสียงเทพ (แก้ไขจุด Error 400) ---
+    async function speakPremium(text) {
+        const apiKey = document.getElementById('gcp-key').value.trim();
+        if (!apiKey || !text) return;
+
+        const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
+        
+        // ✅ จุดสำคัญ: เพิ่ม Headers เพื่อแก้ Error 400
+        const requestOptions = {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({
+                input: { text: text },
+                voice: { 
+                    languageCode: "th-TH", 
+                    name: "th-TH-Standard-B" // เสียงผู้ชาย
+                },
+                audioConfig: { 
+                    audioEncoding: "MP3", 
+                    speakingRate: 1.2 // ความเร็วตามที่คุณต้องการครับ
+                }
+            })
+        };
+
+        try {
+            const response = await fetch(url, requestOptions);
+            const data = await response.json();
+            
+            if (!response.ok) throw new Error(data.error?.message || "GCP API Error");
+
+            if (data.audioContent) {
+                const audio = new Audio("data:audio/mp3;base64," + data.audioContent);
+                await audio.play();
+            }
+        } catch (e) {
+            console.error("TTS Error:", e);
+            statusBox.innerText = "ปัญหาเสียง: " + e.message;
+        }
+    }
     function appendMessage(role, text) {
         const div = document.createElement('div');
         div.className = `msg ${role}`;
