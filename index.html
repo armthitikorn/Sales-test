@@ -71,75 +71,38 @@
     recognition.onend = () => { if (!isProcessing) talkBtn.disabled = false; };
 
     // --- 1. ปรับสมองเป็น Gemini 2.5 Flash เพื่อความไว ---
-    async function askGemini(userInput) {
-        isProcessing = true;
-        statusBox.innerText = "สถานะ: คุณวีระกำลังฟัง...";
-        const apiKey = document.getElementById('gemini-key').value.trim();
-        
-        // ใช้รุ่น 2.5 Flash ตามที่คุยกันไว้ครับ
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-        
-        const prompt = `คุณคือ 'คุณวีระ' ลูกค้าผู้ชายที่กำลังยุ่งมาก 
-                       บทบาท: ปฏิเสธการขายประกันอย่างสุภาพแต่หนักแน่น
-                       กฎสำคัญ: ตอบเป็นภาษาไทยสั้นๆ ไม่เกิน 1 ประโยค เพื่อความสมจริงในการคุยโทรศัพท์
-                       พนักงานขายพูดว่า: "${userInput}"`;
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { maxOutputTokens: 50, temperature: 0.7 }
-                })
-            });
-            const data = await response.json();
-            const aiResponse = data.candidates[0].content.parts[0].text;
-            
-            appendMessage('customer', aiResponse);
-            await speakPremium(aiResponse); 
-        } catch (e) {
-            statusBox.innerText = "Error: " + e.message;
-        } finally {
-            isProcessing = false;
-            statusBox.innerText = "สถานะ: พร้อมรับสาย";
-            talkBtn.disabled = false;
-        }
-    }
-
-    // --- 2. ปรับเป็นเสียงผู้ชายและเพิ่มสปีดการพูด ---
 // --- 2. ระบบคิดคำตอบ (Gemini 2.5 Flash) ---
     async function askGemini(userInput) {
         isProcessing = true;
         statusBox.innerText = "สถานะ: คุณวีระกำลังฟัง...";
         const apiKey = document.getElementById('gemini-key').value.trim();
         
-        // มั่นใจได้เลยครับ ใช้ Gemini 2.5 Flash ตามที่คุณสั่งไว้เสมอ
+        // ใช้ Gemini 2.5 Flash ตามที่คุณต้องการ เพื่อความเร็วสูงสุด
         const modelId = "gemini-2.5-flash"; 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
         
-        const prompt = `คุณคือ 'คุณวีระ' ลูกค้าผู้ชายที่กำลังยุ่ง 
-                       กฎ: ตอบสั้นที่สุด (ไม่เกิน 10 คำ) 
-                       อารมณ์: ปฏิเสธพนักงานขายประกันสั้นๆ
+        const prompt = `คุณคือ 'คุณวีระ' ลูกค้าผู้ชายที่กำลังรีบ 
+                       กฎ: ตอบสั้นๆ ไม่เกิน 10 คำ 
+                       อารมณ์: ปฏิเสธพนักงานขายประกันสั้นๆ อย่างมีมารยาท
                        พนักงานพูด: "${userInput}"`;
 
         try {
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' }, // ✅ ต้องมี Headers ตัวนี้
                 body: JSON.stringify({ 
                     contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { maxOutputTokens: 50, temperature: 0.7 }
+                    generationConfig: { maxOutputTokens: 40, temperature: 0.7 }
                 })
             });
+
             const data = await response.json();
-            
             if (data.error) throw new Error(data.error.message);
 
             const aiResponse = data.candidates[0].content.parts[0].text;
             appendMessage('customer', aiResponse);
             
-            // ส่งคำตอบไปให้กล่องเสียงทำงาน
+            // ส่งไปให้กล่องเสียงทำงาน
             await speakPremium(aiResponse); 
             
         } catch (e) {
@@ -151,26 +114,26 @@
         }
     }
 
-    // --- 3. ระบบเสียงเทพ (แก้ไขจุด Error 400) ---
+    // --- 3. ระบบเสียงเทพ (แก้ไขชื่อเสียงและ Headers) ---
     async function speakPremium(text) {
         const apiKey = document.getElementById('gcp-key').value.trim();
         if (!apiKey || !text) return;
 
         const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
         
-        // ✅ จุดสำคัญ: เพิ่ม Headers เพื่อแก้ Error 400
         const requestOptions = {
             method: "POST",
-            headers: { "Content-Type": "application/json" }, 
+            headers: { "Content-Type": "application/json" }, // ✅ แก้ไข Error 400 ตรงนี้
             body: JSON.stringify({
                 input: { text: text },
                 voice: { 
                     languageCode: "th-TH", 
-                    name: "th-TH-Standard-B" // เสียงผู้ชาย
+                    name: "th-TH-Neural2-B" // ✅ เปลี่ยนเป็น Neural2-B (เสียงผู้ชายที่มีจริง)
                 },
                 audioConfig: { 
                     audioEncoding: "MP3", 
-                    speakingRate: 1.2 // ความเร็วตามที่คุณต้องการครับ
+                    speakingRate: 1.25, // เร็วทันใจตามสั่ง
+                    pitch: -2.0 // ปรับโทนให้ดูแมนและนิ่งขึ้น
                 }
             })
         };
