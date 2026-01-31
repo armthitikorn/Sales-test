@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>AI Telesales Simulator v4.0 (Premium Voice)</title>
+    <title>AI Telesales Simulator v4.3 (Fast Male Voice)</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #2563eb; --bg: #f0f2f5; }
@@ -26,12 +26,12 @@
 <div class="container">
     <header>
         <h2>🎧 AI Telesales Simulator</h2>
-        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">จำลองการขายประกันด้วยเสียงพรีเมียม</p>
+        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">จำลองการขายประกัน (โหมด: คุณวีระ เสียงชาย/ตอบไว)</p>
     </header>
 
     <div class="api-panel">
-        <input type="password" id="gemini-key" placeholder="วาง Gemini API Key (สมอง AI)">
-        <input type="password" id="gcp-key" placeholder="วาง Google Cloud API Key (เสียงเทพ)">
+        <input type="password" id="gemini-key" placeholder="วาง Gemini API Key">
+        <input type="password" id="gcp-key" placeholder="วาง Google Cloud API Key">
     </div>
 
     <div id="chat-window">
@@ -51,7 +51,6 @@
 
     let isProcessing = false;
 
-    // --- 1. ระบบรับเสียง (Speech Recognition) ---
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new Recognition();
     recognition.lang = 'th-TH';
@@ -71,40 +70,44 @@
 
     recognition.onend = () => { if (!isProcessing) talkBtn.disabled = false; };
 
-    // --- 2. ระบบคิดคำตอบ (Gemini 2.5 Pro) ---
+    // --- 1. ปรับสมองเป็น Gemini 2.5 Flash เพื่อความไว ---
     async function askGemini(userInput) {
         isProcessing = true;
-        statusBox.innerText = "สถานะ: ลูกค้ากำลังคิด...";
+        statusBox.innerText = "สถานะ: คุณวีระกำลังฟัง...";
         const apiKey = document.getElementById('gemini-key').value.trim();
         
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
+        // ใช้รุ่น 2.5 Flash ตามที่คุยกันไว้ครับ
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
         
-        const prompt = `คุณคือ 'คุณวีระ' ลูกค้าชาวไทยวัยทำงานที่กำลังยุ่งมาก 
-                       บทบาท: คุณไม่ชอบคนโทรมาขายประกัน และจะพยายามปฏิเสธอย่างสุภาพแต่หนักแน่นในตอนแรก
-                       กฎ: ตอบโต้เป็นภาษาไทยสั้นๆ (ไม่เกิน 2 ประโยค) เหมือนคุยโทรศัพท์จริง ห้ามหลุดคาแรกเตอร์
+        const prompt = `คุณคือ 'คุณวีระ' ลูกค้าผู้ชายที่กำลังยุ่งมาก 
+                       บทบาท: ปฏิเสธการขายประกันอย่างสุภาพแต่หนักแน่น
+                       กฎสำคัญ: ตอบเป็นภาษาไทยสั้นๆ ไม่เกิน 1 ประโยค เพื่อความสมจริงในการคุยโทรศัพท์
                        พนักงานขายพูดว่า: "${userInput}"`;
 
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                body: JSON.stringify({ 
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { maxOutputTokens: 50, temperature: 0.7 }
+                })
             });
             const data = await response.json();
             const aiResponse = data.candidates[0].content.parts[0].text;
             
             appendMessage('customer', aiResponse);
-            await speakPremium(aiResponse); // เรียกใช้เสียงเทพ
+            await speakPremium(aiResponse); 
         } catch (e) {
-            statusBox.innerText = "Error (Gemini): " + e.message;
+            statusBox.innerText = "Error: " + e.message;
         } finally {
             isProcessing = false;
-            statusBox.innerText = "สถานะ: พร้อมฟังต่อ";
+            statusBox.innerText = "สถานะ: พร้อมรับสาย";
             talkBtn.disabled = false;
         }
     }
 
-    // --- 3. ระบบเสียงเทพ (Google Cloud TTS) ---
+    // --- 2. ปรับเป็นเสียงผู้ชายและเพิ่มสปีดการพูด ---
     async function speakPremium(text) {
         const apiKey = document.getElementById('gcp-key').value.trim();
         if (!apiKey) return;
@@ -112,8 +115,14 @@
         const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
         const body = {
             input: { text: text },
-            voice: { languageCode: "th-TH", name: "th-TH-Standard-A" },
-            audioConfig: { audioEncoding: "MP3" }
+            voice: { 
+                languageCode: "th-TH", 
+                name: "th-TH-Standard-B" // ✅ เปลี่ยนเป็น Standard-B (เสียงผู้ชาย)
+            },
+            audioConfig: { 
+                audioEncoding: "MP3",
+                speakingRate: 1.15 // ✅ ปรับให้พูดเร็วขึ้นนิดหน่อยเพื่อให้ดูทันใจ
+            }
         };
 
         try {
