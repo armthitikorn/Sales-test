@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>AI Telesales Simulator v4.0 (Premium Voice)</title>
+    <title>AI Telesales Simulator v4.1 (Fast Response)</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #2563eb; --bg: #f0f2f5; }
@@ -26,12 +26,12 @@
 <div class="container">
     <header>
         <h2>🎧 AI Telesales Simulator</h2>
-        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">จำลองการขายประกันด้วยเสียงพรีเมียม</p>
+        <p style="margin:5px 0 0 0; font-size: 0.8em; opacity: 0.9;">จำลองการขายประกันด้วยเสียงพรีเมียม (Speed Optimized)</p>
     </header>
 
     <div class="api-panel">
-        <input type="password" id="gemini-key" placeholder="วาง Gemini API Key (สมอง AI)">
-        <input type="password" id="gcp-key" placeholder="วาง Google Cloud API Key (เสียงเทพ)">
+        <input type="password" id="gemini-key" placeholder="วาง API Key (ใช้กุญแจดอกเดียวกันได้)">
+        <input type="password" id="gcp-key" placeholder="วาง Google Cloud API Key (สำหรับเสียงเทพ)">
     </div>
 
     <div id="chat-window">
@@ -59,7 +59,7 @@
     talkBtn.addEventListener('click', () => {
         if (isProcessing) return;
         
-        // ** จุดสำคัญ: ปลดล็อกระบบเสียงก่อนเริ่มทำงาน **
+        // ปลดล็อกระบบเสียงก่อนเริ่มทำงาน
         const unlockAudio = new Audio();
         unlockAudio.play().catch(() => {}); 
 
@@ -76,69 +76,66 @@
 
     recognition.onend = () => { if (!isProcessing) talkBtn.disabled = false; };
 
-    // --- 2. ระบบคิดคำตอบ (Gemini 2.5 Flash) ---
-async function askGemini(userInput) {
-    isProcessing = true;
-    statusBox.innerText = "สถานะ: ลูกค้ากำลังประมวลผล...";
-    
-    // ใช้ API Key ที่คุณเพิ่งสร้างจากหน้า Vertex AI (ภาพที่ 2)
-    const apiKey = document.getElementById('gemini-key').value.trim();
-    
-    // ✅ แก้ไข URL: สำหรับ Google Cloud (Vertex AI) ต้องใช้โครงสร้างนี้ครับ
-    // หมายเหตุ: ตรวจสอบให้แน่ใจว่าได้ Enable "Vertex AI API" ในโปรเจกต์แล้ว
-    const modelId = "gemini-2.5-flash"; 
-    const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${modelId}:generateContent?key=${apiKey}`;
-    
-    const prompt = `คุณคือ 'คุณวีระ' (ผู้ชาย) ลูกค้าที่ยุ่งมาก 
-                   กฎ: ตอบภาษาไทยสั้นๆ เท่านั้น (ห้ามเกิน 1 ประโยค) 
-                   อารมณ์: ปฏิเสธการขายประกันอย่างสุภาพแต่หนักแน่น
-                   พนักงานพูด: "${userInput}"`;
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: { maxOutputTokens: 50, temperature: 0.7 }
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            // ถ้ายังติด Error 401 หรือ 403 จะแสดงรายละเอียดที่นี่
-            throw new Error(data.error?.message || "การเชื่อมต่อล้มเหลว");
-        }
-
-        if (data.candidates && data.candidates[0].content) {
-            const aiResponse = data.candidates[0].content.parts[0].text;
-            appendMessage('customer', aiResponse);
-            await speakPremium(aiResponse); 
-        }
+    // --- 2. ระบบคิดคำตอบ (Optimized for Speed) ---
+    async function askGemini(userInput) {
+        isProcessing = true;
+        statusBox.innerText = "สถานะ: ลูกค้ากำลังคิด...";
+        const apiKey = document.getElementById('gemini-key').value.trim();
         
-    } catch (e) {
-        statusBox.innerText = "แจ้งเตือน: " + e.message;
-        console.error("Gemini Error:", e);
-    } finally {
-        isProcessing = false;
-        statusBox.innerText = "สถานะ: พร้อมรับสาย";
-        talkBtn.disabled = false;
+        // ใช้รุ่น 1.5-flash เพื่อความเร็วที่เสถียรที่สุดผ่าน URL นี้
+        const modelId = "gemini-1.5-flash"; 
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+        
+        const prompt = `คุณคือ 'คุณวีระ' (ผู้ชาย) ลูกค้าที่ยุ่งมาก 
+                       บทบาท: คุณไม่ชอบคนโทรมาขายประกันและจะพยายามปฏิเสธสั้นๆ
+                       กฎ: ตอบภาษาไทยสั้นๆ เท่านั้น (ห้ามเกิน 1 ประโยค) 
+                       พนักงานพูด: "${userInput}"`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { maxOutputTokens: 40, temperature: 0.7 }
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.error) throw new Error(data.error.message);
+
+            if (data.candidates && data.candidates[0].content) {
+                const aiResponse = data.candidates[0].content.parts[0].text;
+                appendMessage('customer', aiResponse);
+                await speakPremium(aiResponse); 
+            } else {
+                throw new Error("ลูกค้าเงียบไป...");
+            }
+            
+        } catch (e) {
+            statusBox.innerText = "แจ้งเตือน: " + e.message;
+            console.error("Gemini Error:", e);
+        } finally {
+            isProcessing = false;
+            if (!statusBox.innerText.includes("แจ้งเตือน")) statusBox.innerText = "สถานะ: พร้อมรับสาย";
+            talkBtn.disabled = false;
+        }
     }
-}
-    // --- 3. ระบบเสียงเทพ (แก้ไขให้ชัวร์ว่าดังแน่นอน) ---
+
+    // --- 3. ระบบเสียงเทพ (Speed 1.2x) ---
     async function speakPremium(text) {
         const apiKey = document.getElementById('gcp-key').value.trim();
-        if (!apiKey) {
-            console.error("Missing GCP API Key");
-            return;
-        }
+        if (!apiKey) return;
 
         const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
         const body = {
             input: { text: text },
             voice: { languageCode: "th-TH", name: "th-TH-Standard-B" },
-            audioConfig: { audioEncoding: "MP3", speakingRate: 1.1 }
+            audioConfig: { 
+                audioEncoding: "MP3", 
+                speakingRate: 1.2  // ปรับให้พูดเร็วขึ้นตามคำขอครับ
+            }
         };
 
         try {
@@ -146,16 +143,13 @@ async function askGemini(userInput) {
             const data = await response.json();
             
             if (data.error) throw new Error(data.error.message);
-            if (!data.audioContent) throw new Error("No audio content returned from Google");
 
-            // เล่นไฟล์เสียง
             const audio = new Audio("data:audio/mp3;base64," + data.audioContent);
             await audio.play();
             
         } catch (e) {
             console.error("TTS Error:", e);
             statusBox.innerText = "ปัญหาเสียง: " + e.message;
-            statusBox.style.background = "#fee2e2";
         }
     }
 
