@@ -174,8 +174,8 @@
                 if (data.customerName) displayName.innerText = data.customerName;
                 
                 appendMessage('bot', data.text);
-                history.push({ role: "user", parts: [{ text: message }] });
-                history.push({ role: "model", parts: [{ text: data.text }] });
+                history.push({ role: "user", content: message });
+                history.push({ role: "assistant", content: data.text });
 
                 if (data.audio) {
                     audioPlayer.src = `data:audio/mp3;base64,${data.audio}`;
