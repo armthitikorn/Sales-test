@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI Telesales Simulator PRO (17-Point Evaluation)</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-cognitiveservices-speech-sdk/1.23.0/microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Kanit', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
@@ -12,6 +15,8 @@
         @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { transform: scale(1.1); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
         .chat-area { height: calc(100vh - 300px); scrollbar-width: none; }
         .chat-area::-webkit-scrollbar { display: none; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
 <body class="bg-slate-50 overflow-hidden">
@@ -26,11 +31,11 @@
                     <h1 class="font-bold text-slate-800 text-lg leading-tight">Telesales Simulator</h1>
                     <p class="text-[11px] text-slate-500 flex items-center gap-1">
                         <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                        AI Evaluation System Ready
+                        AI Evaluation (17 Points) Active
                     </p>
                 </div>
             </div>
-            <select id="level-select" class="bg-slate-100 border-none text-xs font-semibold rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+            <select id="level-select" class="bg-slate-100 border-none text-[10px] font-semibold rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
                 <option value="1">LEVEL 1: คุณเปรมวดี (เกษียณ)</option>
                 <option value="2">LEVEL 2: คุณสมเกียรติ (คำนวณ)</option>
                 <option value="3">LEVEL 3: คุณฤทัย (สายเหวี่ยง)</option>
@@ -39,11 +44,11 @@
         </div>
     </header>
 
-    <main class="max-w-2xl mx-auto p-4 chat-area overflow-y-auto" id="chat-container">
+    <main class="max-w-2xl mx-auto p-4 chat-area overflow-y-auto custom-scroll" id="chat-container">
         <div class="flex gap-3 mb-6 animate-fade-in">
-            <div class="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center font-bold text-slate-500 text-xs shadow-sm border border-white">AI</div>
+            <div class="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center font-bold text-slate-500 text-xs border border-white shadow-sm">AI</div>
             <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 max-w-[85%]">
-                <p class="text-slate-700 text-sm leading-relaxed">สวัสดีค่ะ/ครับ พร้อมแล้วกด "เริ่มโทรหาลูกค้า" ได้เลยนะคะ ระบบจะประเมินตามเกณฑ์ 17 ข้อค่ะ</p>
+                <p class="text-slate-700 text-sm leading-relaxed">สวัสดีค่ะ พร้อมแล้วกด "เริ่มโทร" ได้เลยนะคะ ระบบจะประเมินตามกฎ คปภ. 17 ข้อค่ะ</p>
             </div>
         </div>
     </main>
@@ -51,15 +56,15 @@
     <footer class="fixed bottom-0 left-0 right-0 bg-white border-t p-6 pb-8 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
         <div class="max-w-2xl mx-auto">
             <div class="flex items-center gap-4">
-                <button id="start-call-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-200 active:scale-95 flex items-center justify-center gap-2">
+                <button id="start-call-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
                     <span>เริ่มโทรหาลูกค้า</span>
                 </button>
                 
-                <button id="stop-call-btn" class="hidden w-16 h-16 bg-slate-100 text-slate-400 rounded-full transition-all flex items-center justify-center group active:scale-90">
-                    <svg class="w-8 h-8 group-[.mic-active]:text-white transition-colors" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"/></svg>
+                <button id="stop-call-btn" class="hidden w-16 h-16 bg-slate-100 text-slate-400 rounded-full transition-all flex items-center justify-center active:scale-90 border-2">
+                    <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"/></svg>
                 </button>
 
-                <button id="end-call-btn" class="hidden flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-red-100 active:scale-95">
+                <button id="end-call-btn" class="hidden flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl transition-all shadow-lg active:scale-95">
                     จบการสนทนาและประเมิน
                 </button>
             </div>
@@ -67,38 +72,41 @@
     </footer>
 
     <div id="eval-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-scale-up">
-            <div id="result-header" class="p-6 text-center text-white bg-blue-600 transition-colors">
-                <p class="text-xs uppercase tracking-widest font-bold opacity-80 mb-1">Result Analysis</p>
-                <h2 id="pass-fail-text" class="text-2xl font-black italic">กำลังประมวลผล...</h2>
+        <div class="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl">
+            <div id="result-header" class="p-6 text-center text-white bg-blue-600">
+                <p class="text-xs uppercase tracking-widest font-bold opacity-80 mb-1">Evaluation Result</p>
+                <h2 id="pass-fail-text" class="text-2xl font-black italic">ประมวลผลสำเร็จ</h2>
             </div>
             
             <div class="p-8">
-                <div class="flex items-center justify-between mb-8 bg-slate-50 p-6 rounded-[2rem] border">
+                <div class="flex items-center justify-between mb-6 bg-slate-50 p-6 rounded-[2rem] border">
                     <div class="text-left">
-                        <p class="text-[10px] font-bold text-slate-400 uppercase">Total performance</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Performance Score</p>
                         <div class="flex items-baseline gap-1">
                             <span id="score-val" class="text-5xl font-black text-slate-800 tracking-tighter">0</span>
-                            <span class="text-slate-400 font-bold text-sm">Score / 100</span>
+                            <span class="text-slate-400 font-bold text-sm">/ 100</span>
                         </div>
                     </div>
-                    <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <div class="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                 </div>
 
                 <div id="eval-details" class="space-y-4 max-h-[40vh] overflow-y-auto pr-2 custom-scroll">
                     </div>
 
-                <button onclick="location.reload()" class="w-full mt-8 bg-slate-900 text-white font-bold py-5 rounded-2xl hover:bg-black transition-all shadow-lg active:scale-95">
+                <button onclick="location.reload()" class="w-full mt-8 bg-slate-900 text-white font-bold py-5 rounded-2xl hover:bg-black transition-all active:scale-95">
                     เริ่มฝึกฝนใหม่
                 </button>
             </div>
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-cognitiveservices-speech-sdk/1.23.0/microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
     <script>
+        // ตั้งค่าตัวแปรสำหรับ Microsoft Speech SDK
+        const speechKey = "c2489816e88a452d92167d353683a45c"; // **ตรวจสอบ Key ของคุณอาร์มให้ถูกต้อง**
+        const speechRegion = "southeastasia";
+
         let recognizer;
         let chatHistory = [];
         let isCalling = false;
@@ -132,31 +140,48 @@
         }
 
         async function handleSpeechInput() {
-            const speechConfig = window.SpeechSDK.SpeechConfig.fromSubscription("c2489816e88a452d92167d353683a45c", "southeastasia");
-            speechConfig.speechRecognitionLanguage = "th-TH";
-            const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-            recognizer = new window.SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
-
-            recognizer.recognizeOnceAsync(async result => {
-                if (result.reason === window.SpeechSDK.ResultReason.RecognizedSpeech) {
-                    const userText = result.text;
-                    addMessage('user', userText);
-                    
-                    const res = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            message: userText, 
-                            history: chatHistory, 
-                            level: levelSelect.value 
-                        })
-                    });
-                    const data = await res.json();
-                    addMessage('assistant', data.text);
-                    if (data.audio) await playAudio(data.audio);
-                }
+            // ตรวจสอบว่า SDK โหลดสำเร็จหรือไม่
+            const SDK = window.SpeechSDK || SpeechSDK;
+            if (!SDK) {
+                alert("Speech SDK ยังโหลดไม่เสร็จ กรุณารอสักครู่หรือเช็คอินเทอร์เน็ตครับ");
                 stopCallBtn.classList.remove('mic-active');
-            });
+                return;
+            }
+
+            try {
+                const speechConfig = SDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
+                speechConfig.speechRecognitionLanguage = "th-TH";
+                const audioConfig = SDK.AudioConfig.fromDefaultMicrophoneInput();
+                recognizer = new SDK.SpeechRecognizer(speechConfig, audioConfig);
+
+                recognizer.recognizeOnceAsync(async result => {
+                    if (result.reason === SDK.ResultReason.RecognizedSpeech) {
+                        const userText = result.text;
+                        addMessage('user', userText);
+                        
+                        const res = await fetch('/api/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                message: userText, 
+                                history: chatHistory, 
+                                level: levelSelect.value 
+                            })
+                        });
+                        const data = await res.json();
+                        addMessage('assistant', data.text);
+                        if (data.audio) await playAudio(data.audio);
+                    }
+                    stopCallBtn.classList.remove('mic-active');
+                    recognizer.close();
+                }, err => {
+                    console.error(err);
+                    stopCallBtn.classList.remove('mic-active');
+                });
+            } catch (err) {
+                console.error(err);
+                stopCallBtn.classList.remove('mic-active');
+            }
         }
 
         startCallBtn.addEventListener('click', () => {
@@ -173,6 +198,9 @@
         });
 
         endCallBtn.addEventListener('click', async () => {
+            endCallBtn.disabled = true;
+            endCallBtn.innerText = "กำลังประเมิน...";
+            
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -187,8 +215,7 @@
             document.getElementById('pass-fail-text').innerText = `${evalData.performance_level} (${score >= 60 ? 'PASS' : 'FAIL'})`;
             document.getElementById('score-val').innerText = score;
 
-            // Render Checklist 17 ข้อ
-            let checklistHTML = `<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-4">Checklist 17 หัวข้อ ประเมินโดย AI</p>`;
+            let checklistHTML = `<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-4">Checklist ประเมิน 17 หัวข้อ:</p>`;
             checklistHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 p-4 rounded-3xl border text-[10px]">`;
             evalData.checklist_17.forEach(item => {
                 const icon = item.status === 'pass' ? '✅' : '❌';
