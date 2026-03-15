@@ -31,11 +31,11 @@
                     <h1 class="font-bold text-slate-800 text-lg leading-tight">Telesales Simulator</h1>
                     <p class="text-[11px] text-slate-500 flex items-center gap-1">
                         <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                        AI Evaluation (17 Points) Active
+                        AI Evaluation (17 Points) Ready
                     </p>
                 </div>
             </div>
-            <select id="level-select" class="bg-slate-100 border-none text-[10px] font-semibold rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+            <select id="level-select" class="bg-slate-100 border-none text-[10px] font-semibold rounded-lg px-2 py-2 outline-none">
                 <option value="1">LEVEL 1: คุณเปรมวดี (เกษียณ)</option>
                 <option value="2">LEVEL 2: คุณสมเกียรติ (คำนวณ)</option>
                 <option value="3">LEVEL 3: คุณฤทัย (สายเหวี่ยง)</option>
@@ -48,7 +48,7 @@
         <div class="flex gap-3 mb-6 animate-fade-in">
             <div class="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center font-bold text-slate-500 text-xs border border-white shadow-sm">AI</div>
             <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 max-w-[85%]">
-                <p class="text-slate-700 text-sm leading-relaxed">สวัสดีค่ะ พร้อมแล้วกด "เริ่มโทร" ได้เลยนะคะ ระบบจะประเมินตามกฎ คปภ. 17 ข้อค่ะ</p>
+                <p class="text-slate-700 text-sm leading-relaxed">สวัสดีค่ะ พร้อมแล้วกด "เริ่มโทรหาลูกค้า" เพื่อฝึกฝนได้เลยค่ะ</p>
             </div>
         </div>
     </main>
@@ -60,8 +60,8 @@
                     <span>เริ่มโทรหาลูกค้า</span>
                 </button>
                 
-                <button id="stop-call-btn" class="hidden w-16 h-16 bg-slate-100 text-slate-400 rounded-full transition-all flex items-center justify-center active:scale-90 border-2">
-                    <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"/></svg>
+                <button id="stop-call-btn" class="hidden w-16 h-16 bg-slate-100 text-slate-400 rounded-full transition-all flex items-center justify-center active:scale-90 border-2 group">
+                    <svg class="w-8 h-8 group-[.mic-active]:text-red-500" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"/></svg>
                 </button>
 
                 <button id="end-call-btn" class="hidden flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl transition-all shadow-lg active:scale-95">
@@ -74,14 +74,14 @@
     <div id="eval-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl">
             <div id="result-header" class="p-6 text-center text-white bg-blue-600">
-                <p class="text-xs uppercase tracking-widest font-bold opacity-80 mb-1">Evaluation Result</p>
+                <p class="text-xs uppercase tracking-widest font-bold opacity-80 mb-1">Analysis Report</p>
                 <h2 id="pass-fail-text" class="text-2xl font-black italic">ประมวลผลสำเร็จ</h2>
             </div>
             
             <div class="p-8">
                 <div class="flex items-center justify-between mb-6 bg-slate-50 p-6 rounded-[2rem] border">
                     <div class="text-left">
-                        <p class="text-[10px] font-bold text-slate-400 uppercase">Performance Score</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Final Score</p>
                         <div class="flex items-baseline gap-1">
                             <span id="score-val" class="text-5xl font-black text-slate-800 tracking-tighter">0</span>
                             <span class="text-slate-400 font-bold text-sm">/ 100</span>
@@ -103,9 +103,9 @@
     </div>
 
     <script>
-        // ตั้งค่าตัวแปรสำหรับ Microsoft Speech SDK
-        const speechKey = "c2489816e88a452d92167d353683a45c"; // **ตรวจสอบ Key ของคุณอาร์มให้ถูกต้อง**
-        const speechRegion = "southeastasia";
+        // กำหนด Key และ Region จากโปรเจกต์คุณอาร์ม
+        const AZURE_SPEECH_KEY = "c2489816e88a452d92167d353683a45c";
+        const AZURE_SPEECH_REGION = "southeastasia";
 
         let recognizer;
         let chatHistory = [];
@@ -135,21 +135,24 @@
         }
 
         async function playAudio(base64) {
-            const audio = new Audio("data:audio/wav;base64," + base64);
-            await audio.play();
+            try {
+                const audio = new Audio("data:audio/wav;base64," + base64);
+                await audio.play();
+            } catch (e) { console.error("Audio play failed", e); }
         }
 
         async function handleSpeechInput() {
-            // ตรวจสอบว่า SDK โหลดสำเร็จหรือไม่
-            const SDK = window.SpeechSDK || SpeechSDK;
+            // FIX: ตรวจสอบ SDK ผ่าน window. เท่านั้นเพื่อป้องกัน ReferenceError
+            const SDK = window.SpeechSDK;
+            
             if (!SDK) {
-                alert("Speech SDK ยังโหลดไม่เสร็จ กรุณารอสักครู่หรือเช็คอินเทอร์เน็ตครับ");
+                alert("ระบบ Speech SDK ยังโหลดไม่เสร็จสิ้น หรือถูกบล็อกโดยเครือข่าย กรุณารีเฟรชหน้าเว็บอีกครั้งค่ะ");
                 stopCallBtn.classList.remove('mic-active');
                 return;
             }
 
             try {
-                const speechConfig = SDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
+                const speechConfig = SDK.SpeechConfig.fromSubscription(AZURE_SPEECH_KEY, AZURE_SPEECH_REGION);
                 speechConfig.speechRecognitionLanguage = "th-TH";
                 const audioConfig = SDK.AudioConfig.fromDefaultMicrophoneInput();
                 recognizer = new SDK.SpeechRecognizer(speechConfig, audioConfig);
@@ -189,50 +192,61 @@
             startCallBtn.classList.add('hidden');
             stopCallBtn.classList.remove('hidden');
             endCallBtn.classList.remove('hidden');
-            addMessage('assistant', 'ตู๊ด... ตู๊ด... ฮัลโหล สวัสดีค่ะ?');
+            addMessage('assistant', 'ตู๊ด... ตู๊ด... ฮัลโหล สวัสดีค่ะ? (เริ่มสนทนาได้โดยกดรูปไมค์)');
         });
 
         stopCallBtn.addEventListener('click', () => {
+            if (stopCallBtn.classList.contains('mic-active')) return;
             stopCallBtn.classList.add('mic-active');
             handleSpeechInput();
         });
 
         endCallBtn.addEventListener('click', async () => {
             endCallBtn.disabled = true;
-            endCallBtn.innerText = "กำลังประเมิน...";
+            endCallBtn.innerText = "กำลังประมวลผลการประเมิน...";
             
-            const res = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ history: chatHistory, isEnding: true })
-            });
-            const data = await res.json();
-            const evalData = data.evaluation;
-            const score = evalData.score;
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ history: chatHistory, isEnding: true })
+                });
+                const data = await res.json();
+                const evalData = data.evaluation;
+                const score = evalData.score;
 
-            document.getElementById('eval-modal').classList.remove('hidden');
-            document.getElementById('result-header').className = `p-6 text-center text-white ${score >= 60 ? 'bg-green-600' : 'bg-red-600'}`;
-            document.getElementById('pass-fail-text').innerText = `${evalData.performance_level} (${score >= 60 ? 'PASS' : 'FAIL'})`;
-            document.getElementById('score-val').innerText = score;
+                document.getElementById('eval-modal').classList.remove('hidden');
+                document.getElementById('result-header').className = `p-6 text-center text-white ${score >= 60 ? 'bg-green-600' : 'bg-red-600'}`;
+                document.getElementById('pass-fail-text').innerText = `${evalData.performance_level} (${score >= 60 ? 'PASS' : 'FAIL'})`;
+                document.getElementById('score-val').innerText = score;
 
-            let checklistHTML = `<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-4">Checklist ประเมิน 17 หัวข้อ:</p>`;
-            checklistHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 p-4 rounded-3xl border text-[10px]">`;
-            evalData.checklist_17.forEach(item => {
-                const icon = item.status === 'pass' ? '✅' : '❌';
-                const textColor = item.status === 'pass' ? 'text-green-700 font-medium' : 'text-red-500';
-                checklistHTML += `<div class="flex items-start gap-2 border-b border-slate-200/50 pb-1.5 last:border-0">
-                    <span class="flex-shrink-0">${icon}</span>
-                    <span class="${textColor}">${item.task}</span>
-                </div>`;
-            });
-            checklistHTML += `</div>`;
+                // สร้างรายการ Checklist 17 ข้อ
+                let checklistHTML = `<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-4">Checklist 17 หัวข้อ (ประเมินโดย AI):</p>`;
+                checklistHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 p-4 rounded-3xl border text-[10px]">`;
+                
+                if(evalData.checklist_17) {
+                    evalData.checklist_17.forEach(item => {
+                        const icon = item.status === 'pass' ? '✅' : '❌';
+                        const textColor = item.status === 'pass' ? 'text-green-700 font-medium' : 'text-red-500';
+                        checklistHTML += `<div class="flex items-start gap-2 border-b border-slate-200/50 pb-1.5 last:border-0">
+                            <span class="flex-shrink-0">${icon}</span>
+                            <span class="${textColor}">${item.task}</span>
+                        </div>`;
+                    });
+                }
+                checklistHTML += `</div>`;
 
-            document.getElementById('eval-details').innerHTML = `
-                <div class="p-3 bg-green-50 rounded-2xl border-l-4 border-green-500 text-[11px]"><p class="font-bold text-green-700">จุดแข็ง:</p><p>${evalData.strengths}</p></div>
-                <div class="p-3 bg-red-50 rounded-2xl border-l-4 border-red-500 text-[11px]"><p class="font-bold text-red-700">จุดที่ควรปรับปรุง:</p><p>${evalData.weaknesses}</p></div>
-                ${checklistHTML}
-                <div class="p-4 bg-blue-50 rounded-2xl border-l-4 border-blue-500 text-[11px] font-medium italic"><p>${evalData.feedback}</p></div>
-            `;
+                document.getElementById('eval-details').innerHTML = `
+                    <div class="p-3 bg-green-50 rounded-2xl border-l-4 border-green-500 text-[11px]"><p class="font-bold text-green-700">จุดแข็ง:</p><p>${evalData.strengths || '-'}</p></div>
+                    <div class="p-3 bg-red-50 rounded-2xl border-l-4 border-red-500 text-[11px]"><p class="font-bold text-red-700">จุดที่ควรปรับปรุง:</p><p>${evalData.weaknesses || '-'}</p></div>
+                    ${checklistHTML}
+                    <div class="p-4 bg-blue-50 rounded-2xl border-l-4 border-blue-500 text-[11px] font-medium italic"><p>${evalData.feedback || ''}</p></div>
+                `;
+            } catch (err) {
+                alert("เกิดข้อผิดพลาดในการประเมินผล");
+                endCallBtn.disabled = false;
+                endCallBtn.innerText = "จบการสนทนาและประเมิน";
+            }
         });
     </script>
 </body>
