@@ -1,13 +1,12 @@
-/**************************************************
+/*******************************************************
  * chat.js
- * AI Customer + Compliance Monitor (Final)
- **************************************************/
-
+ * AI Customer – Pure Roleplay Mode (No Coaching)
+ *******************************************************/
 const { AzureOpenAI } = require("openai");
 const sdk = require("microsoft-cognitiveservices-speech-sdk");
 
 /* =========================
-   Azure OpenAI Client
+ Azure OpenAI Client
 ========================= */
 const client = new AzureOpenAI({
   endpoint: process.env.AZURE_OPENAI_ENDPOINT,
@@ -17,7 +16,7 @@ const client = new AzureOpenAI({
 });
 
 /* =========================
-   Azure Speech Config
+ Azure Speech Config
 ========================= */
 const speechConfig = sdk.SpeechConfig.fromSubscription(
   process.env.AZURE_SPEECH_KEY,
@@ -25,14 +24,13 @@ const speechConfig = sdk.SpeechConfig.fromSubscription(
 );
 
 /* =========================
-   Utilities
+ Utilities
 ========================= */
 const cleanTextForSpeech = (text) =>
   text.replace(/\(.*?\)/g, "")
       .replace(/\[.*?\]/g, "")
       .trim();
 
-/** ✅ FIXED: syntax error */
 const getVoiceName = (level) => {
   const voices = {
     "1": "th-TH-PremwadeeNeural",
@@ -44,14 +42,15 @@ const getVoiceName = (level) => {
 };
 
 /* =========================
-   Global Compliance Rules
+ Global Compliance Rules
+ (No Coaching / No First Turn Guard)
 ========================= */
 const globalRules = `
 [บทบาทหลัก]
-คุณคือ "ลูกค้า" ที่รับสายโทรศัพท์ และยังไม่รู้ว่าใครโทรมา
-คุณต้องโต้ตอบอย่างเป็นธรรมชาติ แต่มีหน้าที่ตรวจสอบคำพูดการขาย
+คุณคือ "ลูกค้า" ที่รับสายโทรศัพท์
+โต้ตอบตามบทบาทลูกค้าจริงอย่างเป็นธรรมชาติ
 
-[กฎเหล็ก – ต้องตักเตือนทันที]
+[ข้อห้ามด้าน Compliance]
 คำต้องห้าม:
 - ดอกเบี้ย, กำไร, ฝากเงิน, ออมเงิน
 - เคลมได้ทุกกรณี, ผู้ป่วยนอกได้ทุกกรณี
@@ -70,60 +69,32 @@ const globalRules = `
 - ประกันเหมาจ่ายผู้ป่วยใน
 - วงเงินค่ารักษาพยาบาล
 
-[รูปแบบการตักเตือน]
-⚠️ ตักเตือน: ระบุคำ/ประโยคที่ผิด → ขอให้ปรับ → กลับสู่บทบาทลูกค้า
-
-[พฤติกรรมลูกค้า]
-- คุณเป็น "ผู้รับสาย" ไม่ใช่ผู้โทร
-- ช่วงแรกต้องระวังตัว ตอบสั้น และยังไม่ให้ความร่วมมือ
-- ห้าม assume ว่ารู้ว่าใครโทรมา หรือโทรมาเรื่องอะไร
-
-[กฎพิเศษ – First Turn Guard (สำคัญมาก)]
-- หากยังไม่พบว่าพนักงานแนะนำตัวครบถ้วน
-  (ชื่อ–นามสกุล / เลขใบอนุญาต / บริษัท / ขออนุญาตบันทึกเสียง)
-  ให้ถือว่าทุกคำตอบของคุณเป็น "First Turn"
-
-- First Turn:
-  • ห้ามใช้ประโยคเชิงต้อนรับหรือช่วยเหลือ เช่น:
-    "ยินดีที่ได้พูดคุย", "มีอะไรให้ช่วย", "สอบถามเกี่ยวกับประกัน"
-  • ห้ามพูดถึงคำว่า "ประกัน", "ผลิตภัณฑ์", "ความคุ้มครอง"
-  • ต้องถามกลับเท่านั้น เช่น:
-    - "โทรมาจากไหนคะ"
-    - "ขอทราบชื่อกับบริษัทที่ติดต่อมาหน่อยค่ะ"
-    - "ใครโทรมาคะ โทรมาเรื่องอะไรคะ"
-
-- หากคุณเผลอใช้ประโยคเชิงต้อนรับใน First Turn
-  ให้ถือว่าผิดบทบาท และต้องแก้คำตอบใหม่ทันที
+[ข้อกำหนดสำคัญ]
+- ห้ามสอนงานพนักงาน
+- ห้ามไกด์ขั้นตอนการขาย
+- ห้ามเตือนเรื่องการแนะนำตัว เลขใบอนุญาต หรือการบันทึกเสียง
+- โต้ตอบเหมือนลูกค้าทั่วไปที่รับสายจริง
 `;
 
 /* =========================
-   System Prompts (Levels)
+ System Prompts (Personas)
 ========================= */
-
 const systemPrompts = {
   "1": `
-คุณคือ "คุณเปรมวดี" อายุ 40 ปี สุภาพ เป๊ะ รอบคอบ
-- ใช้คำลงท้ายว่า "ค่ะ" เท่านั้น
-- ห้ามใช้ "ครับ"
+คุณคือ "คุณเปรมวดี" อายุ 40 ปี สุภาพ รอบคอบ
+- ใช้คำลงท้ายว่า "ค่ะ"
 ${globalRules}
 `,
-
   "2": `
 คุณคือ "คุณสมเกียรติ" สุขุม ใช้เหตุผล พูดน้อย
-- ใช้คำลงท้ายว่า "ครับ" เท่านั้น
-- น้ำเสียงเป็นกลาง ไม่สุภาพเกินไป
+- ใช้คำลงท้ายว่า "ครับ"
 ${globalRules}
 `,
-
   "3": `
-คุณคือ "คุณฤทัย" ผู้จัดการกฎหมาย ดุ ตรง ไม่ชอบเสียเวลา
-- ไม่จำเป็นต้องใช้คำลงท้ายทุกประโยค
-- หากใช้ ให้ใช้ "คะ" หรือไม่มีคำลงท้าย
-- ห้ามใช้ "ค่ะ" แบบสุภาพเกินไป
+คุณคือ "คุณฤทัย" ผู้จัดการกฎหมาย ดุ ตรง
+- ใช้ภาษาตรง ไม่สุภาพเกินไป
 ${globalRules}
 `,
-
-
 "4": `
 คุณคือ "คุณฐิติกร" ประธานเจ้าหน้าที่บริหาร (CEO)
 บุคลิก: สุขุม นิ่ง พูดสั้น ตรงประเด็น ไม่สุภาพเกินไป
@@ -138,14 +109,13 @@ ${globalRules}
 };
 
 /* =========================
-   Evaluation Prompt (End Call)
+ Evaluation Prompt (End Call)
 ========================= */
 const evaluationPrompt = `
 คุณคือ QA ตรวจสอบการขายประกันทางโทรศัพท์
 ตรวจสอบตามเกณฑ์ 17 ข้อ
 - ตรวจจับคำต้องห้ามอย่างเคร่งครัด
 - ระบุจำนวนครั้งที่พยายามปิดการขายจริง
-
 ตอบเป็น JSON เท่านั้น:
 {
   "total_score": 0-100,
@@ -162,7 +132,7 @@ const evaluationPrompt = `
 `;
 
 /* =========================
-   API Handler
+ API Handler
 ========================= */
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
@@ -172,7 +142,7 @@ module.exports = async function handler(req, res) {
   const { message, history, level, isEnding } = req.body;
 
   try {
-    /* ====== End Call → Evaluation ====== */
+    /* ===== End Call → Evaluation ===== */
     if (isEnding) {
       const response = await client.chat.completions.create({
         messages: [
@@ -187,7 +157,7 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    /* ====== Normal Conversation ====== */
+    /* ===== Normal Roleplay Conversation ===== */
     const completion = await client.chat.completions.create({
       messages: [
         { role: "system", content: systemPrompts[String(level)] },
