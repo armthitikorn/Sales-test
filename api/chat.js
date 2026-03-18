@@ -137,38 +137,39 @@ module.exports = async function handler(req, res) {
       temperature: 0.3
     });
 
-    const aiText = completion.choices[0].message.content;
+const textToSpeak = cleanTextForSpeech(aiText);
+const voiceName = getVoiceName(level);
 
-    /* ===== Send text immediately ===== */
-    res.json({ text: aiText });
-
-    /* ===== TTS (non-blocking) ===== */
-    setTimeout(() => {
-      try {
-        const textToSpeak = cleanTextForSpeech(aiText);
-        const voiceName = getVoiceName(level);
-
-        const ssml = `
+const ssml = `
 <speak version="1.0" xml:lang="th-TH">
   <voice name="${voiceName}">
     <prosody rate="-15%">${textToSpeak}</prosody>
   </voice>
-</speak>`;
+</speak>
+`;
 
-        const synthesizer = new sdk.SpeechSynthesizer(speechConfig, null);
-        synthesizer.speakSsmlAsync(
-          ssml,
-          () => synthesizer.close(),
-          () => synthesizer.close()
-        );
-      } catch (_) {}
-    }, 0);
+const synthesizer = new sdk.SpeechSynthesizer(speechConfig, null);
 
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({
-      text: "ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง"
-    });
-  }
-};
+const audioData = await new Promise((resolve, reject) => {
+  synthesizer.speakSsmlAsync(
+    ssml,
+    result => {
+      synthesizer.close();
+      if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
+        resolve(result.audioData);
+      } else {
+        reject(result.errorDetails);
+      }
+    },
+    err => {
+      synthesizer.close();
+      reject(err);
+    }
+  );
+});
+
+res.json({
+  text: aiText,
+  audio: Buffer.from(audioData).toString("base64")
+});
 ``
