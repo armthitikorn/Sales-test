@@ -1,10 +1,23 @@
 /**************************************************
- * chat.js
- * AI Customer + Compliance Monitor (Final)
+ * chat.js (Streaming SSE)
+ * AI Customer + Compliance Monitor + Fast UX
+ *
+ * - Conversation: streams tokens via SSE (text/event-stream)
+ * - End call evaluation: returns JSON (as before)
  **************************************************/
 
 const { AzureOpenAI } = require("openai");
 const sdk = require("microsoft-cognitiveservices-speech-sdk");
+
+/* =========================
+   Next.js API Route Config
+   (Keep bodyParser on; SSE is response streaming)
+========================= */
+module.exports.config = {
+  api: {
+    bodyParser: true,
+  },
+};
 
 /* =========================
    Azure OpenAI Client
@@ -13,7 +26,7 @@ const client = new AzureOpenAI({
   endpoint: process.env.AZURE_OPENAI_ENDPOINT,
   apiKey: process.env.AZURE_OPENAI_KEY,
   deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
-  apiVersion: "2024-05-01-preview"
+  apiVersion: "2024-05-01-preview",
 });
 
 /* =========================
@@ -24,27 +37,24 @@ const speechConfig = sdk.SpeechConfig.fromSubscription(
   process.env.AZURE_SPEECH_REGION
 );
 
-/* =========================
-   Utilities
-========================= */
 const cleanTextForSpeech = (text) =>
-  text.replace(/\(.*?\)/g, "")
-      .replace(/\[.*?\]/g, "")
-      .trim();
+  (text || "")
+    .replace(/\(.*?\)/g, "")
+    .replace(/\[.*?\]/g, "")
+    .trim();
 
-/** ✅ FIXED: syntax error */
 const getVoiceName = (level) => {
   const voices = {
     "1": "th-TH-PremwadeeNeural",
     "2": "th-TH-NiwatNeural",
     "3": "th-TH-AcharaNeural",
-    "4": "th-TH-NiwatNeural"
+    "4": "th-TH-NiwatNeural",
   };
   return voices[String(level)] || voices["1"];
 };
 
 /* =========================
-   Global Compliance Rules
+   Global Rules (ย่อได้ตามต้องการ แต่คงสาระ)
 ========================= */
 const globalRules = `
 [บทบาทหลัก]
@@ -63,89 +73,59 @@ const globalRules = `
 - เคลมเหมารวมไม่อิงเงื่อนไข
 - ทำให้เข้าใจว่าเป็นธนาคารหรือบัตรเครดิต
 
-[คำที่อนุญาต]
-- เก็บออมในรูปแบบประกันชีวิต
-- เงินการันตี
-- ประกันชีวิตแบบสะสมทรัพย์
-- ประกันเหมาจ่ายผู้ป่วยใน
-- วงเงินค่ารักษาพยาบาล
-
 [รูปแบบการตักเตือน]
 ⚠️ ตักเตือน: ระบุคำ/ประโยคที่ผิด → ขอให้ปรับ → กลับสู่บทบาทลูกค้า
 
-[พฤติกรรมลูกค้า]
-- คุณเป็น "ผู้รับสาย" ไม่ใช่ผู้โทร
-- ช่วงแรกต้องระวังตัว ตอบสั้น และยังไม่ให้ความร่วมมือ
-- ห้าม assume ว่ารู้ว่าใครโทรมา หรือโทรมาเรื่องอะไร
-
 [กฎพิเศษ – First Turn Guard (สำคัญมาก)]
-- หากยังไม่พบว่าพนักงานแนะนำตัวครบถ้วน
-  (ชื่อ–นามสกุล / เลขใบอนุญาต / บริษัท / ขออนุญาตบันทึกเสียง)
+- หากยังไม่พบว่าพนักงานแนะนำตัวครบ (ชื่อ–นามสกุล / ใบอนุญาต / บริษัท / ขออนุญาตบันทึกเสียง)
   ให้ถือว่าทุกคำตอบของคุณเป็น "First Turn"
-
 - First Turn:
-  • ห้ามใช้ประโยคเชิงต้อนรับหรือช่วยเหลือ เช่น:
-    "ยินดีที่ได้พูดคุย", "มีอะไรให้ช่วย", "สอบถามเกี่ยวกับประกัน"
+  • ห้ามใช้ประโยคเชิงต้อนรับ เช่น "ยินดีที่ได้พูดคุย", "มีอะไรให้ช่วย"
   • ห้ามพูดถึงคำว่า "ประกัน", "ผลิตภัณฑ์", "ความคุ้มครอง"
-  • ต้องถามกลับเท่านั้น เช่น:
-    - "โทรมาจากไหนคะ"
-    - "ขอทราบชื่อกับบริษัทที่ติดต่อมาหน่อยค่ะ"
-    - "ใครโทรมาคะ โทรมาเรื่องอะไรคะ"
+  • ต้องถามกลับเท่านั้น เช่น "โทรมาจากไหน", "ใครติดต่อมา", "โทรมาเรื่องอะไร"
+- หากเผลอใช้คำลงท้าย/คำต้อนรับผิด ให้ถือว่าผิดบทบาทและแก้คำตอบใหม่ทันที
 
-- หากคุณเผลอใช้ประโยคเชิงต้อนรับใน First Turn
-  ให้ถือว่าผิดบทบาท และต้องแก้คำตอบใหม่ทันที
+[Performance Constraint]
+- ตอบให้สั้นที่สุดเท่าที่ถูกต้อง (ไม่อธิบายยาว ไม่บรรยายเหตุผล)
 `;
 
 /* =========================
-   System Prompts (Levels)
+   Persona Prompts
 ========================= */
-
 const systemPrompts = {
   "1": `
 คุณคือ "คุณเปรมวดี" อายุ 40 ปี สุภาพ เป๊ะ รอบคอบ
-- ใช้คำลงท้ายว่า "ค่ะ" เท่านั้น
-- ห้ามใช้ "ครับ"
+- ใช้คำลงท้าย "ค่ะ" เท่านั้น
 ${globalRules}
 `,
-
   "2": `
 คุณคือ "คุณสมเกียรติ" สุขุม ใช้เหตุผล พูดน้อย
-- ใช้คำลงท้ายว่า "ครับ" เท่านั้น
-- น้ำเสียงเป็นกลาง ไม่สุภาพเกินไป
+- ใช้คำลงท้าย "ครับ" เท่านั้น
 ${globalRules}
 `,
-
   "3": `
 คุณคือ "คุณฤทัย" ผู้จัดการกฎหมาย ดุ ตรง ไม่ชอบเสียเวลา
-- ไม่จำเป็นต้องใช้คำลงท้ายทุกประโยค
-- หากใช้ ให้ใช้ "คะ" หรือไม่มีคำลงท้าย
-- ห้ามใช้ "ค่ะ" แบบสุภาพเกินไป
+- ไม่จำเป็นต้องใช้คำลงท้ายทุกประโยค (หลีกเลี่ยง "ค่ะ" แบบสุภาพเกินไป)
 ${globalRules}
 `,
-
-
-"4": `
-คุณคือ "คุณฐิติกร" ประธานเจ้าหน้าที่บริหาร (CEO)
-บุคลิก: สุขุม นิ่ง พูดสั้น ตรงประเด็น ไม่สุภาพเกินไป
-
+  "4": `
+คุณคือ "คุณฐิติกร" CEO พูดสั้น ตรงประเด็น
 [กฎการใช้ภาษา – บังคับใช้]
-- ห้ามใช้คำลงท้ายว่า "ค่ะ" และ "ครับ" ทุกกรณี
-- ห้ามใช้ประโยคเชิงสุภาพแบบพนักงานบริการ
-- พูดเหมือนผู้บริหารที่ถูกรบกวนจากสายโทรศัพท์
-- ใช้ประโยคสั้น กระชับ ไม่มีคำลงท้าย
+- ห้ามใช้ "ค่ะ" และ "ครับ" ทุกกรณี
+- ไม่ใช้คำลงท้าย พูดสั้น กระชับ แบบผู้บริหารที่ถูกรบกวนจากสายโทรศัพท์
+ตัวอย่าง: "โทรจากบริษัทอะไร", "ใครติดต่อมา", "โทรมาเรื่องอะไร"
+หากเผลอใช้คำลงท้าย ให้ถือว่าผิดบทบาทและแก้คำตอบใหม่ทันที
 ${globalRules}
-`
+`,
 };
 
 /* =========================
-   Evaluation Prompt (End Call)
+   Evaluation Prompt (End Call) - JSON
 ========================= */
 const evaluationPrompt = `
 คุณคือ QA ตรวจสอบการขายประกันทางโทรศัพท์
-ตรวจสอบตามเกณฑ์ 17 ข้อ
 - ตรวจจับคำต้องห้ามอย่างเคร่งครัด
 - ระบุจำนวนครั้งที่พยายามปิดการขายจริง
-
 ตอบเป็น JSON เท่านั้น:
 {
   "total_score": 0-100,
@@ -162,84 +142,143 @@ const evaluationPrompt = `
 `;
 
 /* =========================
+   SSE Helpers
+========================= */
+function sseInit(res) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no", // helps on some proxies
+  });
+  // If available, flush headers immediately
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
+  if (res.socket && typeof res.socket.setNoDelay === "function") res.socket.setNoDelay(true);
+}
+
+function sseSend(res, event, dataObj) {
+  // event: optional; if you prefer only "data:" lines, you can omit event
+  if (event) res.write(`event: ${event}\n`);
+  res.write(`data: ${JSON.stringify(dataObj)}\n\n`);
+}
+
+function safeHistory(history) {
+  // Keep last 6 turns for speed (ปรับได้)
+  if (!Array.isArray(history)) return [];
+  return history.slice(-6);
+}
+
+/* =========================
    API Handler
 ========================= */
 module.exports = async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).send("Method Not Allowed");
-  }
+  if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
-  const { message, history, level, isEnding } = req.body;
+  const { message, history, level, isEnding } = req.body || {};
+  const lvl = String(level || "1");
 
   try {
-    /* ====== End Call → Evaluation ====== */
+    /* ====== End Call → Evaluation (non-stream JSON) ====== */
     if (isEnding) {
       const response = await client.chat.completions.create({
         messages: [
           { role: "system", content: evaluationPrompt },
-          { role: "user", content: JSON.stringify(history) }
+          { role: "user", content: JSON.stringify(history || []) },
         ],
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
       });
 
       return res.json({
-        evaluation: JSON.parse(response.choices[0].message.content)
+        evaluation: JSON.parse(response.choices[0].message.content),
       });
     }
 
-    /* ====== Normal Conversation ====== */
-    const completion = await client.chat.completions.create({
-      messages: [
-        { role: "system", content: systemPrompts[String(level)] },
-        ...history,
-        { role: "user", content: message }
-      ],
-      max_tokens: 250,
-      temperature: 0.7
+    /* ====== Streaming Conversation (SSE) ====== */
+    sseInit(res);
+    sseSend(res, "meta", { ok: true, mode: "stream", level: lvl });
+
+    const abortController = new AbortController();
+    req.on("close", () => {
+      // client disconnected
+      try { abortController.abort(); } catch (_) {}
     });
 
-    const aiText = completion.choices[0].message.content;
-    const textToSpeak = cleanTextForSpeech(aiText);
-    const voiceName = getVoiceName(level);
+    const messages = [
+      { role: "system", content: systemPrompts[lvl] || systemPrompts["1"] },
+      ...safeHistory(history),
+      { role: "user", content: message || "" },
+    ];
 
-    const ssml = `
+    // ✅ Speed tuning: ลด tokens + ลด temperature
+    const stream = await client.chat.completions.create(
+      {
+        messages,
+        max_tokens: 80,
+        temperature: 0.3,
+        stream: true, // streaming via SSE from SDK [1](https://www.npmjs.com/package/openai)[2](https://developers.openai.com/api/docs/guides/streaming-responses)
+      },
+      { signal: abortController.signal }
+    );
+
+    let fullText = "";
+
+    for await (const chunk of stream) {
+      const delta = chunk?.choices?.[0]?.delta?.content || "";
+      if (!delta) continue;
+      fullText += delta;
+      // ส่งทีละชิ้น
+      sseSend(res, "delta", { delta });
+    }
+
+    // ===== Optional: synthesize audio AFTER stream complete =====
+    // ถ้าไม่ต้องการเสียงตอนท้าย ให้คอมเมนต์ block นี้ได้เลย
+    try {
+      const textToSpeak = cleanTextForSpeech(fullText);
+      if (textToSpeak) {
+        const voiceName = getVoiceName(lvl);
+        const ssml = `
 <speak version="1.0" xml:lang="th-TH">
   <voice name="${voiceName}">
     <prosody rate="-15%">${textToSpeak}</prosody>
   </voice>
-</speak>
-`;
+</speak>`;
 
-    const synthesizer = new sdk.SpeechSynthesizer(speechConfig, null);
+        const synthesizer = new sdk.SpeechSynthesizer(speechConfig, null);
+        const audioData = await new Promise((resolve, reject) => {
+          synthesizer.speakSsmlAsync(
+            ssml,
+            (result) => {
+              synthesizer.close();
+              if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) resolve(result.audioData);
+              else reject(result.errorDetails);
+            },
+            (err) => {
+              synthesizer.close();
+              reject(err);
+            }
+          );
+        });
 
-    const audioData = await new Promise((resolve, reject) => {
-      synthesizer.speakSsmlAsync(
-        ssml,
-        (result) => {
-          synthesizer.close();
-          if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-            resolve(result.audioData);
-          } else {
-            reject(result.errorDetails);
-          }
-        },
-        (err) => {
-          synthesizer.close();
-          reject(err);
-        }
-      );
-    });
+        sseSend(res, "audio", { audio: Buffer.from(audioData).toString("base64") });
+      }
+    } catch (e) {
+      // ถ้า TTS พลาด ไม่ต้องทำให้สตรีมพัง ส่ง error event แล้วปิด
+      sseSend(res, "warn", { message: "TTS failed", detail: String(e?.message || e) });
+    }
 
-    res.json({
-      text: aiText,
-      audio: Buffer.from(audioData).toString("base64")
-    });
-
+    sseSend(res, "done", { done: true });
+    return res.end();
   } catch (error) {
+    // ถ้าเป็น streaming แล้ว error เกิดหลังส่ง header ไปแล้ว
+    try {
+      if (res.headersSent) {
+        sseSend(res, "error", { message: "ระบบขัดข้อง", detail: String(error?.message || error) });
+        return res.end();
+      }
+    } catch (_) {}
+
     console.error("Error:", error);
-    res.status(500).json({
-      text: "ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง"
-    });
+    return res.status(500).json({ text: "ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง" });
   }
 };
 ``
