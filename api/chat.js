@@ -24,6 +24,9 @@ const speechConfig = sdk.SpeechConfig.fromSubscription(
   process.env.AZURE_SPEECH_REGION
 );
 
+// 👇 เพิ่มการตั้งค่าตรงนี้ เพื่อบังคับให้ออกมาเป็นไฟล์ MP3 สำหรับรองรับการเล่นบนมือถือ (iOS/Android)
+speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
+
 /* =========================
    Utilities
 ========================= */
@@ -242,4 +245,3 @@ module.exports = async function handler(req, res) {
     });
   }
 };
-``
