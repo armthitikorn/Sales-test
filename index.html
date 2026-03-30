@@ -98,7 +98,11 @@
         let history = [];
         let recognition;
         let isProcessing = false;
+        
+        // Audio Context Fix สำหรับ iOS
         const audioPlayer = new Audio();
+        audioPlayer.setAttribute('playsinline', ''); 
+        audioPlayer.setAttribute('preload', 'auto');
 
         function updateCustomerUI(level) {
             const char = charData[level] || charData["1"];
@@ -115,12 +119,21 @@
             appendMessage('bot', `เชื่อมต่อสายกับ ${charData[level].name} แล้วค่ะ...`);
         });
 
+        // ปรับจูน SpeechRecognition ให้เป็นมิตรกับ iOS
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
             recognition.lang = 'th-TH';
-            recognition.interimResults = true;
-            recognition.onstart = () => { micBtn.classList.add('mic-active'); instruction.innerText = "กำลังฟัง..."; };
+            
+            // ปิด interimResults บนอุปกรณ์ Apple
+            recognition.interimResults = !(/iPad|iPhone|iPod/.test(navigator.userAgent)); 
+            recognition.continuous = false;
+
+            recognition.onstart = () => { 
+                micBtn.classList.add('mic-active'); 
+                instruction.innerText = "กำลังฟัง..."; 
+            };
+            
             recognition.onresult = (event) => {
                 const text = event.results[0][0].transcript;
                 userTranscript.innerText = `พูดว่า: ${text}`;
@@ -129,13 +142,29 @@
                     sendToAI(text);
                 }
             };
-            recognition.onend = () => { micBtn.classList.remove('mic-active'); instruction.innerText = "แตะไมค์เพื่อพูดต่อ"; isProcessing = false; };
+
+            recognition.onerror = (event) => {
+                console.error("Speech Recognition Error:", event.error);
+                micBtn.classList.remove('mic-active'); 
+                instruction.innerText = "ไม่ได้ยินเสียง แตะไมค์อีกครั้ง"; 
+                isProcessing = false;
+            };
+
+            recognition.onend = () => { 
+                micBtn.classList.remove('mic-active'); 
+                instruction.innerText = "แตะไมค์เพื่อพูดต่อ"; 
+            };
+        } else {
+            instruction.innerText = "เบราว์เซอร์นี้ไม่รองรับไมโครโฟน";
         }
 
         document.getElementById('start-btn').addEventListener('click', () => {
             const char = charData[levelSelect.value];
             updateCustomerUI(levelSelect.value);
+            
+            // ปลดล็อก Audio ใน iOS ทันทีที่กดปุ่ม
             audioPlayer.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
+            audioPlayer.load();
             audioPlayer.play().then(() => {
                 welcomeScreen.classList.add('hidden');
                 appendMessage('bot', char.intro);
@@ -145,7 +174,18 @@
             });
         });
 
-        micBtn.addEventListener('click', () => { if(recognition) try { recognition.start(); } catch(e) {} });
+        micBtn.addEventListener('click', () => { 
+            // Trick ต่ออายุการเล่นเสียงบน iOS
+            audioPlayer.play().catch(e => {}); 
+
+            if(recognition) {
+                try { 
+                    recognition.start(); 
+                } catch(e) {
+                    console.log("Recognition already started");
+                }
+            } 
+        });
 
         function appendMessage(role, text) {
             const div = document.createElement('div');
@@ -157,7 +197,8 @@
 
         async function sendToAI(message) {
             appendMessage('user', message);
-            userTranscript.innerText = "";
+            userTranscript.innerText = "AI กำลังคิด..."; 
+            
             try {
                 const res = await fetch('/api/chat', {
                     method: 'POST',
@@ -169,17 +210,29 @@
                 appendMessage('bot', data.text);
                 history.push({ role: "user", content: message });
                 history.push({ role: "assistant", content: data.text });
+                userTranscript.innerText = "";
 
                 if (data.audio) {
                     audioPlayer.src = `data:audio/mp3;base64,${data.audio}`;
-                    audioPlayer.play();
+                    audioPlayer.load();
+                    const playPromise = audioPlayer.play();
+                    
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.error("iOS Audio Playback Prevented:", error);
+                        });
+                    }
                 }
 
                 if (data.forceDisconnect) {
                     setTimeout(() => { alert("สายหลุดเนื่องจาก: " + data.text); location.reload(); }, 3000);
                 }
-            } catch (e) { alert("เกิดข้อผิดพลาดในการเชื่อมต่อ"); }
-            finally { isProcessing = false; }
+            } catch (e) { 
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ"); 
+                console.error(e);
+            } finally { 
+                isProcessing = false; 
+            }
         }
 
         endCallBtn.addEventListener('click', async () => {
@@ -196,18 +249,15 @@
                 const data = await res.json();
                 const evalData = data.evaluation;
                 
-                // รองรับข้อมูลใหม่จาก Backend (total_score และ evaluation_results)
                 const score = evalData.total_score || 0;
 
                 document.getElementById('eval-modal').classList.remove('hidden');
                 
-                // เกณฑ์การแสดงสี Pass/Fail (อ้างอิง 70%)
                 const isPass = score >= 70;
                 document.getElementById('result-header').className = `p-6 text-center text-white ${isPass ? 'bg-green-600' : 'bg-red-600'}`;
                 document.getElementById('pass-fail-text').innerText = isPass ? 'ผ่านเกณฑ์ (PASS)' : 'ไม่ผ่านเกณฑ์ (FAIL)';
                 document.getElementById('score-val').innerText = score;
 
-                // สร้างตารางประเมิน 17 ข้อ
                 let breakdownHTML = `<div class="bg-slate-50 p-3 rounded-xl text-[10px] border space-y-1 max-h-60 overflow-y-auto shadow-inner">`;
                 evalData.evaluation_results.forEach(item => {
                     let statusColor = "text-slate-500";
@@ -223,7 +273,6 @@
                 });
                 breakdownHTML += `</div>`;
                 
-                // แสดงส่วนสรุป (Summary)
                 const summary = evalData.summary || {};
                 document.getElementById('eval-details').innerHTML = `
                     ${breakdownHTML}
