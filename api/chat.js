@@ -1,8 +1,3 @@
-/**************************************************
- * chat.js
- * AI Customer + Compliance Monitor (Final)
- **************************************************/
-
 const { AzureOpenAI } = require("openai");
 const sdk = require("microsoft-cognitiveservices-speech-sdk");
 
@@ -12,7 +7,7 @@ const sdk = require("microsoft-cognitiveservices-speech-sdk");
 const client = new AzureOpenAI({
   endpoint: process.env.AZURE_OPENAI_ENDPOINT,
   apiKey: process.env.AZURE_OPENAI_KEY,
-  deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
+  deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || process.env.AZURE_OPENAI_DEPLOYMENT,
   apiVersion: "2024-05-01-preview"
 });
 
@@ -20,11 +15,11 @@ const client = new AzureOpenAI({
    Azure Speech Config
 ========================= */
 const speechConfig = sdk.SpeechConfig.fromSubscription(
-  process.env.AZURE_SPEECH_KEY,
-  process.env.AZURE_SPEECH_REGION
+  process.env.AZURE_SPEECH_KEY || process.env.AZURE_API_KEY,
+  process.env.AZURE_SPEECH_REGION || process.env.AZURE_REGION || "southeastasia"
 );
 
-// 👇 เพิ่มการตั้งค่าตรงนี้ เพื่อบังคับให้ออกมาเป็นไฟล์ MP3 สำหรับรองรับการเล่นบนมือถือ (iOS/Android)
+// บังคับ Output เป็น MP3 รองรับการเล่นบนอุปกรณ์เคลื่อนที่ทุกระบบ (iOS/Android)
 speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
 
 /* =========================
@@ -35,16 +30,16 @@ const cleanTextForSpeech = (text) =>
       .replace(/\[.*?\]/g, "")
       .trim();
 
-/** ✅ FIXED: syntax error */
-const getVoiceName = (level) => {
-  const voices = {
-    "1": "th-TH-PremwadeeNeural",
-    "2": "th-TH-NiwatNeural",
-    "3": "th-TH-AcharaNeural",
-    "4": "th-TH-NiwatNeural"
+const getVoiceConfig = (level) => {
+  const configs = {
+    "1": { name: "th-TH-PremwadeeNeural", rate: "-10%", pitch: "0%" },
+    "2": { name: "th-TH-NiwatNeural", rate: "-12%", pitch: "-2%" },
+    "3": { name: "th-TH-AcharaNeural", rate: "+5%", pitch: "+5%" },
+    "4": { name: "th-TH-NiwatNeural", rate: "-15%", pitch: "-8%" }
   };
-  return voices[String(level)] || voices["1"];
+  return configs[String(level)] || configs["1"];
 };
+
 /* =========================
    Global Compliance Rules
 ========================= */
@@ -81,27 +76,16 @@ const globalRules = `
 - ห้าม assume ว่ารู้ว่าใครโทรมา หรือโทรมาเรื่องอะไร
 
 [กฎพิเศษ – First Turn Guard (สำคัญมาก)]
-- หากยังไม่พบว่าพนักงานแนะนำตัวครบถ้วน
-  (ชื่อ–นามสกุล / เลขใบอนุญาต / บริษัท / ขออนุญาตบันทึกเสียง)
-  ให้ถือว่าทุกคำตอบของคุณเป็น "First Turn"
-
+- หากยังไม่พบว่าพนักงานแนะนำตัวครบถ้วน (ชื่อ–นามสกุล / เลขใบอนุญาต / บริษัท / ขออนุญาตบันทึกเสียง) ให้ถือว่าทุกคำตอบของคุณเป็น "First Turn"
 - First Turn:
-  • ห้ามใช้ประโยคเชิงต้อนรับหรือช่วยเหลือ เช่น:
-    "ยินดีที่ได้พูดคุย", "มีอะไรให้ช่วย", "สอบถามเกี่ยวกับประกัน"
+  • ห้ามใช้ประโยคเชิงต้อนรับหรือช่วยเหลือ เช่น: "ยินดีที่ได้พูดคุย", "มีอะไรให้ช่วย", "สอบถามเกี่ยวกับประกัน"
   • ห้ามพูดถึงคำว่า "ประกัน", "ผลิตภัณฑ์", "ความคุ้มครอง"
-  • ต้องถามกลับเท่านั้น เช่น:
-    - "โทรมาจากไหนคะ"
-    - "ขอทราบชื่อกับบริษัทที่ติดต่อมาหน่อยค่ะ"
-    - "ใครโทรมาคะ โทรมาเรื่องอะไรคะ"
-
-- หากคุณเผลอใช้ประโยคเชิงต้อนรับใน First Turn
-  ให้ถือว่าผิดบทบาท และต้องแก้คำตอบใหม่ทันที
+  • ต้องถามกลับเท่านั้น เช่น: "โทรมาจากไหนคะ", "ขอทราบชื่อกับบริษัทที่ติดต่อมาหน่อยค่ะ", "ใครโทรมาคะ โทรมาเรื่องอะไรคะ"
 `;
 
 /* =========================
    System Prompts (Levels)
 ========================= */
-
 const systemPrompts = {
   "1": `
 คุณคือ "คุณเปรมวดี" อายุ 40 ปี สุภาพ เป๊ะ รอบคอบ
@@ -125,8 +109,7 @@ ${globalRules}
 ${globalRules}
 `,
 
-
-"4": `
+  "4": `
 คุณคือ "คุณฐิติกร" ประธานเจ้าหน้าที่บริหาร (CEO)
 บุคลิก: สุขุม นิ่ง พูดสั้น ตรงประเด็น ไม่สุภาพเกินไป
 
@@ -148,17 +131,17 @@ const evaluationPrompt = `
 - ตรวจจับคำต้องห้ามอย่างเคร่งครัด
 - ระบุจำนวนครั้งที่พยายามปิดการขายจริง
 
-ตอบเป็น JSON เท่านั้น:
+ตอบเป็น JSON เท่านั้นในรูปแบบโครงสร้างนี้:
 {
   "total_score": 0-100,
   "evaluation_results": [
-    { "item": 1, "topic": "", "status": "Pass/Fail", "score": 0, "comment": "" }
+    { "item": 1, "topic": "การเปิดการขายและแจ้งใบอนุญาต", "status": "Pass/Fail", "score": 0, "comment": "..." }
   ],
   "summary": {
-    "strengths": "",
-    "weaknesses": "",
+    "strengths": "...",
+    "weaknesses": "...",
     "closing_attempts_count": 0,
-    "feedback": ""
+    "feedback": "..."
   }
 }
 `;
@@ -176,24 +159,36 @@ module.exports = async function handler(req, res) {
   try {
     /* ====== End Call → Evaluation ====== */
     if (isEnding) {
+      const formattedHistory = (history || []).map(h => ({
+        role: h.role === "user" ? "user" : "assistant",
+        content: h.parts ? h.parts[0].text : (h.content || h.text || "")
+      }));
+
       const response = await client.chat.completions.create({
         messages: [
           { role: "system", content: evaluationPrompt },
-          { role: "user", content: JSON.stringify(history) }
+          { role: "user", content: JSON.stringify(formattedHistory) }
         ],
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
+        temperature: 0.2
       });
 
-      return res.json({
-        evaluation: JSON.parse(response.choices[0].message.content)
-      });
+      const evalResult = JSON.parse(response.choices[0].message.content);
+      return res.status(200).json({ evaluation: evalResult });
     }
 
     /* ====== Normal Conversation ====== */
+    const formattedHistory = (history || []).map(h => ({
+      role: h.role === "user" ? "user" : "assistant",
+      content: h.parts ? h.parts[0].text : (h.content || h.text || "")
+    }));
+
+    const systemPrompt = systemPrompts[String(level)] || systemPrompts["1"];
+
     const completion = await client.chat.completions.create({
       messages: [
-        { role: "system", content: systemPrompts[String(level)] },
-        ...history,
+        { role: "system", content: systemPrompt },
+        ...formattedHistory,
         { role: "user", content: message }
       ],
       max_tokens: 250,
@@ -202,12 +197,12 @@ module.exports = async function handler(req, res) {
 
     const aiText = completion.choices[0].message.content;
     const textToSpeak = cleanTextForSpeech(aiText);
-    const voiceName = getVoiceName(level);
+    const voice = getVoiceConfig(level);
 
     const ssml = `
 <speak version="1.0" xml:lang="th-TH">
-  <voice name="${voiceName}">
-    <prosody rate="-15%">${textToSpeak}</prosody>
+  <voice name="${voice.name}">
+    <prosody rate="${voice.rate}" pitch="${voice.pitch}">${textToSpeak}</prosody>
   </voice>
 </speak>
 `;
@@ -222,7 +217,7 @@ module.exports = async function handler(req, res) {
           if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
             resolve(result.audioData);
           } else {
-            reject(result.errorDetails);
+            reject(result.errorDetails || "Speech synthesis failed");
           }
         },
         (err) => {
@@ -232,15 +227,16 @@ module.exports = async function handler(req, res) {
       );
     });
 
-    res.json({
+    return res.status(200).json({
       text: aiText,
       audio: Buffer.from(audioData).toString("base64")
     });
 
   } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({
-      text: "ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง"
+    console.error("API Handler Error:", error);
+    return res.status(500).json({
+      text: "ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง",
+      error: error.message
     });
   }
 };
