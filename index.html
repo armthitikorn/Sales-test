@@ -58,7 +58,6 @@
 
     <!-- Modal สรุปผล -->
     <div id="eval-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center bg-slate-900/95 backdrop-blur-sm p-4">
-        <!-- โค้ด Modal เดิม -->
         <div class="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div id="result-header" class="p-6 text-center text-white bg-blue-600">
                 <h3 class="text-2xl font-bold">ผลการทดสอบ</h3>
@@ -148,7 +147,7 @@
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
             recognition.lang = 'th-TH';
-            recognition.interimResults = false; // ปิดเพื่อความเสถียรบนมือถือ
+            recognition.interimResults = false; 
             recognition.continuous = false;
 
             recognition.onstart = () => { 
@@ -167,7 +166,11 @@
 
             recognition.onerror = (event) => {
                 micBtn.classList.remove('mic-active'); 
-                instruction.innerText = "แตะไมค์อีกครั้ง (Error: " + event.error + ")"; 
+                if (event.error === 'no-speech' || event.error === 'aborted') {
+                    instruction.innerText = "ไม่ได้ยินเสียง แตะไมค์แล้วพูดใหม่อีกครั้ง";
+                } else {
+                    instruction.innerText = "แตะไมค์อีกครั้ง (Error: " + event.error + ")"; 
+                }
                 isProcessing = false;
             };
 
@@ -183,7 +186,7 @@
             const char = charData[levelSelect.value];
             updateCustomerUI(levelSelect.value);
             
-            // ปลดล็อก Audio บน iOS ด้วยไฟล์เสียงเปล่า (Silence)
+            // ปลดล็อก Audio บน iOS ด้วยไฟล์เสียงเปล่า (Silence) ตอนกดปุ่มเริ่มต้นครั้งเดียว
             audioPlayer.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
             audioPlayer.play().catch(e => console.log("Init audio bypassed"));
             
@@ -191,17 +194,30 @@
             appendMessage('bot', char.intro);
         });
 
+        // ✅ แก้ไขจุดที่ทำให้ไมค์ตัด: เอาคำสั่งเล่น audioPlayer ออกจากปุ่มไมค์ และเพิ่มระบบหยุดเสียง AI / Reset Recognition
         micBtn.addEventListener('click', () => { 
-            // ให้เล่นเสียงเงียบก่อนเริ่มฟัง เพื่อรักษาบริบทการโต้ตอบผู้ใช้ไว้
-            audioPlayer.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
-            audioPlayer.play().catch(e => {}); 
+            if (isProcessing) return;
 
-            if(recognition && !isProcessing) {
-                try { recognition.start(); } catch(e) {}
+            // หยุดเสียง AI ทันทีถ้า AI กำลังพูดอยู่เวลากดพูดแทรก
+            if (!audioPlayer.paused) {
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+            }
+
+            if(recognition) {
+                try { 
+                    recognition.stop(); 
+                } catch(e) {}
+
+                // หน่วงเวลาเล็กน้อยให้เบราว์เซอร์สลับสถานะฮาร์ดแวร์ไมค์ได้สมบูรณ์
+                setTimeout(() => {
+                    try { 
+                        recognition.start(); 
+                    } catch(e) {}
+                }, 100);
             } 
         });
 
-        // ฟังก์ชันวาดกล่องข้อความ และคืนค่า Element กลับไปเผื่อต้องเพิ่มปุ่มทีหลัง
         function appendMessage(role, text) {
             const div = document.createElement('div');
             div.className = `max-w-[85%] p-3 rounded-2xl text-sm ${role === 'user' ? 'bg-blue-600 text-white self-end rounded-tr-none shadow-md' : 'bg-white text-slate-800 self-start border border-slate-100 rounded-tl-none shadow-sm'}`;
@@ -224,7 +240,6 @@
                 });
                 const data = await res.json();
                 
-                // วาดข้อความ AI
                 const botMessageDiv = appendMessage('bot', data.text);
                 
                 history.push({ role: "user", content: message });
@@ -239,14 +254,13 @@
                         if (playPromise !== undefined) {
                             playPromise.catch(error => {
                                 console.warn("iOS Blocked Audio:", error);
-                                // 3. ถ้า iOS บล็อกเสียง ให้แสดงปุ่ม "กดเพื่อฟัง" ใต้ข้อความ
                                 const playBtn = document.createElement('button');
                                 playBtn.className = "mt-2 bg-slate-200 text-slate-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 active:bg-slate-300";
                                 playBtn.innerHTML = `🔊 กดเพื่อฟังเสียง`;
                                 playBtn.onclick = () => {
                                     audioPlayer.src = blobUrl;
                                     audioPlayer.play();
-                                    playBtn.remove(); // กดเสร็จแล้วลบปุ่มทิ้ง
+                                    playBtn.remove();
                                 };
                                 botMessageDiv.appendChild(playBtn);
                             });
