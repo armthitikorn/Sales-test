@@ -196,28 +196,33 @@
 
         // ✅ แก้ไขจุดที่ทำให้ไมค์ตัด: เอาคำสั่งเล่น audioPlayer ออกจากปุ่มไมค์ และเพิ่มระบบหยุดเสียง AI / Reset Recognition
         micBtn.addEventListener('click', () => { 
-            if (isProcessing) return;
+    if (isProcessing) return;
 
-            // หยุดเสียง AI ทันทีถ้า AI กำลังพูดอยู่เวลากดพูดแทรก
-            if (!audioPlayer.paused) {
-                audioPlayer.pause();
-                audioPlayer.currentTime = 0;
+    // 1. หยุดเสียง AI เก่าถ้ากำลังเล่นอยู่
+    if (!audioPlayer.paused) {
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0;
+    }
+
+    if (recognition) {
+        // 2. ป้องกัน Exception จากการสั่ง stop/start ซ้อนกัน
+        try { 
+            recognition.abort(); // ใช้ abort() แทน stop() จะตัด session เก่าได้เด็ดขาดกว่า
+        } catch(e) {}
+
+        // หน่วงเวลา 150ms ให้ Audio Driver คืนไมค์ให้เบราว์เซอร์เรียบร้อยก่อน
+        setTimeout(() => {
+            try { 
+                recognition.start(); 
+            } catch(e) {
+                console.warn("Recognition start bypassed:", e);
+                // ถ้าเกิด DOMException ไม่ต้องตกใจ ให้เคลียร์ state เพื่อกดใหม่ได้
+                micBtn.classList.remove('mic-active');
+                instruction.innerText = "แตะไมค์แล้วลองพูดใหม่อีกครั้ง";
             }
-
-            if(recognition) {
-                try { 
-                    recognition.stop(); 
-                } catch(e) {}
-
-                // หน่วงเวลาเล็กน้อยให้เบราว์เซอร์สลับสถานะฮาร์ดแวร์ไมค์ได้สมบูรณ์
-                setTimeout(() => {
-                    try { 
-                        recognition.start(); 
-                    } catch(e) {}
-                }, 100);
-            } 
-        });
-
+        }, 150);
+    } 
+});
         function appendMessage(role, text) {
             const div = document.createElement('div');
             div.className = `max-w-[85%] p-3 rounded-2xl text-sm ${role === 'user' ? 'bg-blue-600 text-white self-end rounded-tr-none shadow-md' : 'bg-white text-slate-800 self-start border border-slate-100 rounded-tl-none shadow-sm'}`;
