@@ -4,10 +4,12 @@ const sdk = require("microsoft-cognitiveservices-speech-sdk");
 /* =========================
    Azure OpenAI Client
 ========================= */
+const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || process.env.AZURE_OPENAI_DEPLOYMENT;
+
 const client = new AzureOpenAI({
   endpoint: process.env.AZURE_OPENAI_ENDPOINT,
   apiKey: process.env.AZURE_OPENAI_KEY,
-  deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || process.env.AZURE_OPENAI_DEPLOYMENT,
+  deployment: deploymentName,
   apiVersion: "2024-05-01-preview"
 });
 
@@ -18,8 +20,7 @@ const speechConfig = sdk.SpeechConfig.fromSubscription(
   process.env.AZURE_SPEECH_KEY || process.env.AZURE_API_KEY,
   process.env.AZURE_SPEECH_REGION || process.env.AZURE_REGION || "southeastasia"
 );
-
-// บังคับ Output เป็น MP3 รองรับการเล่นบนอุปกรณ์เคลื่อนที่ทุกระบบ (iOS/Android)
+// ล็อก Format MP3 ไว้ตั้งแต่เริ่มต้นเพื่อป้องกัน Concurrency Issue
 speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
 
 /* =========================
@@ -28,6 +29,11 @@ speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio
 const cleanTextForSpeech = (text) =>
   text.replace(/\(.*?\)/g, "")
       .replace(/\[.*?\]/g, "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;")
       .trim();
 
 const getVoiceConfig = (level) => {
@@ -38,6 +44,19 @@ const getVoiceConfig = (level) => {
     "4": { name: "th-TH-NiwatNeural", rate: "-15%", pitch: "-8%" }
   };
   return configs[String(level)] || configs["1"];
+};
+
+// แปลง Role ให้ตรงสเปก OpenAI (เช่น แปลง 'model' ของ Gemini ให้เป็น 'assistant')
+const normalizeHistory = (history = []) => {
+  return history.map(h => {
+    let role = h.role === "user" ? "user" : "assistant";
+    let content = "";
+    if (typeof h.content === "string") content = h.content;
+    else if (h.text) content = h.text;
+    else if (h.parts && h.parts[0]) content = h.parts[0].text || "";
+
+    return { role, content };
+  });
 };
 
 /* =========================
@@ -87,43 +106,14 @@ const globalRules = `
    System Prompts (Levels)
 ========================= */
 const systemPrompts = {
-  "1": `
-คุณคือ "คุณเปรมวดี" อายุ 40 ปี สุภาพ เป๊ะ รอบคอบ
-- ใช้คำลงท้ายว่า "ค่ะ" เท่านั้น
-- ห้ามใช้ "ครับ"
-${globalRules}
-`,
-
-  "2": `
-คุณคือ "คุณสมเกียรติ" สุขุม ใช้เหตุผล พูดน้อย
-- ใช้คำลงท้ายว่า "ครับ" เท่านั้น
-- น้ำเสียงเป็นกลาง ไม่สุภาพเกินไป
-${globalRules}
-`,
-
-  "3": `
-คุณคือ "คุณฤทัย" ผู้จัดการกฎหมาย ดุ ตรง ไม่ชอบเสียเวลา
-- ไม่จำเป็นต้องใช้คำลงท้ายทุกประโยค
-- หากใช้ ให้ใช้ "คะ" หรือไม่มีคำลงท้าย
-- ห้ามใช้ "ค่ะ" แบบสุภาพเกินไป
-${globalRules}
-`,
-
-  "4": `
-คุณคือ "คุณฐิติกร" ประธานเจ้าหน้าที่บริหาร (CEO)
-บุคลิก: สุขุม นิ่ง พูดสั้น ตรงประเด็น ไม่สุภาพเกินไป
-
-[กฎการใช้ภาษา – บังคับใช้]
-- ห้ามใช้คำลงท้ายว่า "ค่ะ" และ "ครับ" ทุกกรณี
-- ห้ามใช้ประโยคเชิงสุภาพแบบพนักงานบริการ
-- พูดเหมือนผู้บริหารที่ถูกรบกวนจากสายโทรศัพท์
-- ใช้ประโยคสั้น กระชับ ไม่มีคำลงท้าย
-${globalRules}
-`
+  "1": `คุณคือ "คุณเปรมวดี" อายุ 40 ปี สุภาพ เป๊ะ รอบคอบ\n- ใช้คำลงท้ายว่า "ค่ะ" เท่านั้น\n- ห้ามใช้ "ครับ"\n${globalRules}`,
+  "2": `คุณคือ "คุณสมเกียรติ" สุขุม ใช้เหตุผล พูดน้อย\n- ใช้คำลงท้ายว่า "ครับ" เท่านั้น\n- น้ำเสียงเป็นกลาง ไม่สุภาพเกินไป\n${globalRules}`,
+  "3": `คุณคือ "คุณฤทัย" ผู้จัดการกฎหมาย ดุ ตรง ไม่ชอบเสียเวลา\n- ไม่จำเป็นต้องใช้คำลงท้ายทุกประโยค\n- หากใช้ ให้ใช้ "คะ" หรือไม่มีคำลงท้าย\n- ห้ามใช้ "ค่ะ" แบบสุภาพเกินไป\n${globalRules}`,
+  "4": `คุณคือ "คุณฐิติกร" ประธานเจ้าหน้าที่บริหาร (CEO)\nบุคลิก: สุขุม นิ่ง พูดสั้น ตรงประเด็น ไม่สุภาพเกินไป\n\n[กฎการใช้ภาษา – บังคับใช้]\n- ห้ามใช้คำลงท้ายว่า "ค่ะ" และ "ครับ" ทุกกรณี\n- ห้ามใช้ประโยคเชิงสุภาพแบบพนักงานบริการ\n- พูดเหมือนผู้บริหารที่ถูกรบกวนจากสายโทรศัพท์\n- ใช้ประโยคสั้น กระชับ ไม่มีคำลงท้าย\n${globalRules}`
 };
 
 /* =========================
-   Evaluation Prompt (End Call)
+   Evaluation Prompt
 ========================= */
 const evaluationPrompt = `
 คุณคือ QA ตรวจสอบการขายประกันทางโทรศัพท์
@@ -133,7 +123,7 @@ const evaluationPrompt = `
 
 ตอบเป็น JSON เท่านั้นในรูปแบบโครงสร้างนี้:
 {
-  "total_score": 0-100,
+  "total_score": 0,
   "evaluation_results": [
     { "item": 1, "topic": "การเปิดการขายและแจ้งใบอนุญาต", "status": "Pass/Fail", "score": 0, "comment": "..." }
   ],
@@ -157,14 +147,12 @@ module.exports = async function handler(req, res) {
   const { message, history, level, isEnding } = req.body;
 
   try {
+    const formattedHistory = normalizeHistory(history);
+
     /* ====== End Call → Evaluation ====== */
     if (isEnding) {
-      const formattedHistory = (history || []).map(h => ({
-        role: h.role === "user" ? "user" : "assistant",
-        content: h.parts ? h.parts[0].text : (h.content || h.text || "")
-      }));
-
       const response = await client.chat.completions.create({
+        model: deploymentName, // ใส่ deployment model ป้องกัน error
         messages: [
           { role: "system", content: evaluationPrompt },
           { role: "user", content: JSON.stringify(formattedHistory) }
@@ -173,19 +161,18 @@ module.exports = async function handler(req, res) {
         temperature: 0.2
       });
 
-      const evalResult = JSON.parse(response.choices[0].message.content);
+      const rawContent = response.choices[0].message.content;
+      const cleanJson = rawContent.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+      const evalResult = JSON.parse(cleanJson);
+
       return res.status(200).json({ evaluation: evalResult });
     }
 
     /* ====== Normal Conversation ====== */
-    const formattedHistory = (history || []).map(h => ({
-      role: h.role === "user" ? "user" : "assistant",
-      content: h.parts ? h.parts[0].text : (h.content || h.text || "")
-    }));
-
     const systemPrompt = systemPrompts[String(level)] || systemPrompts["1"];
 
     const completion = await client.chat.completions.create({
+      model: deploymentName, // ใส่ deployment model ป้องกัน error
       messages: [
         { role: "system", content: systemPrompt },
         ...formattedHistory,
@@ -207,9 +194,10 @@ module.exports = async function handler(req, res) {
 </speak>
 `;
 
-    const synthesizer = new sdk.SpeechSynthesizer(speechConfig, null);
-
+    // Speech Synthesis พร้อม Memory Leak Protection
     const audioData = await new Promise((resolve, reject) => {
+      const synthesizer = new sdk.SpeechSynthesizer(speechConfig, null);
+
       synthesizer.speakSsmlAsync(
         ssml,
         (result) => {
@@ -217,7 +205,7 @@ module.exports = async function handler(req, res) {
           if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
             resolve(result.audioData);
           } else {
-            reject(result.errorDetails || "Speech synthesis failed");
+            reject(new Error(result.errorDetails || "Speech synthesis failed"));
           }
         },
         (err) => {
