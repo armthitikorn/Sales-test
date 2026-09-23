@@ -57,6 +57,15 @@ const normalizeHistory = (history = []) => {
   });
 };
 
+// กันเคสที่ประโยคสุดท้ายในประวัติซ้ำกับข้อความใหม่ที่ส่งมา
+// (เช่น client ยิง request ซ้ำจาก speech recognition เด้ง event สองครั้ง)
+const isDuplicateOfLastTurn = (formattedHistory, message) => {
+  if (formattedHistory.length === 0) return false;
+  const lastUserTurn = [...formattedHistory].reverse().find(h => h.role === "user");
+  if (!lastUserTurn) return false;
+  return lastUserTurn.content.trim() === String(message).trim();
+};
+
 /* =========================
    Global Compliance Rules & Customer Psychology
 ========================= */
@@ -188,6 +197,15 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ evaluation: evalResult });
     }
 
+    /* ====== กันข้อความซ้ำจาก client (เช่น speech recognition ยิง event ซ้ำ) ====== */
+    if (isDuplicateOfLastTurn(formattedHistory, message)) {
+      console.warn("Duplicate turn detected, skipping AI call:", message);
+      return res.status(200).json({
+        text: null,
+        duplicate: true
+      });
+    }
+
     /* ====== Normal Conversation ====== */
     const systemPrompt = systemPrompts[String(level)] || systemPrompts["1"];
 
@@ -198,8 +216,10 @@ module.exports = async function handler(req, res) {
         ...formattedHistory,
         { role: "user", content: message }
       ],
-      max_tokens: 120, // บังคับให้ตอบสั้นกระชับเหมือนคนพูดโทรศัพท์จริง
-      temperature: 0.8 // เพิ่มความธรรมชาติ ยืดหยุ่น ไม่แข็งเป็นบท
+      max_tokens: 150, // เผื่อพื้นที่ขึ้นอีกนิด กันตัดกลางประโยคซึ่งบางทีทำให้ดูเหมือนพูดค้าง/วนซ้ำ
+      temperature: 0.8,
+      frequency_penalty: 0.4, // กดไม่ให้โมเดลพูดคำ/วลีเดิมซ้ำในคำตอบเดียวกัน (สาเหตุหลักของอาการพูดซ้ำ)
+      presence_penalty: 0.3   // กระตุ้นให้พูดเรื่องใหม่แทนวนเรื่องเดิม
     });
 
     const aiText = completion.choices[0].message.content;
